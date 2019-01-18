@@ -1,0 +1,15 @@
+{
+	"tcp": {
+		"port": 27015,
+		"relay": true
+	},
+	"serial": {
+		"autodiscover": true,
+		"port": "/dev/ttyACM0"
+	},
+	"logging": {
+		"type": "debug",
+		"output": "stream"
+	}
+}
+
