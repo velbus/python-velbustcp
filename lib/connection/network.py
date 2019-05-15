@@ -142,15 +142,15 @@ class Network():
                     try:
                         conn = self.__context.wrap_socket(ssock, server_side=True)
                     except ssl.SSLError as e:
-                        print(e)
+                        self.__logger.err("Coudln't wrap socket: " + str(e))
+
                 else:
                     conn = ssock
                 
             except Exception as e:
-                print(e)
-                break
+                self.__logger.err("Error accepting socket: " + str(e))
 
-            if self.is_active():
+            if conn:
                 self.__logger.info("TCP connection from " + str(address))
 
                 # Add the connection to the connected clients set
@@ -159,8 +159,6 @@ class Network():
                         "address": address,
                         "authenticated": False if self.__auth else True,
                     }
-
-                    print(self.__clients[conn])
 
                 # Start up a new client thread to handle the client communication
                 client_thread       = threading.Thread(target=self.__handle_client, args=(conn,))
