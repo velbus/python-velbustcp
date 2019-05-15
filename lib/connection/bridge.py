@@ -44,10 +44,10 @@ class Bridge():
         """
         Called when bus goes into error.
 
-        Closed both bus and TCP connection, then re-opens.
+        Closed both bus, then re-opens.
         """
 
-        self.stop()
+        self.__bus.stop()
         self.start()
     
     def bus_packet_received(self, packet):

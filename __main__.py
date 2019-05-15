@@ -68,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument("--settings", help="Settings file", required=False, default="settings.json")
     args = parser.parse_args()
 
+    # Open settings file
     with open(args.settings, 'r') as f:
         settings = json.load(f)
 

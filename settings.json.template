@@ -1,7 +1,12 @@
 {
 	"tcp": {
 		"port": 27015,
-		"relay": true
+		"relay": true,
+		"ssl": true,
+		"cert": "certificate.pem",
+		"pk": "privkey.pem",
+		"auth": true,
+		"auth_key": "your_auth_key"
 	},
 	"serial": {
 		"autodiscover": true,
@@ -12,4 +17,3 @@
 		"output": "stream"
 	}
 }
-

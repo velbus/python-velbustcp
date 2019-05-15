@@ -1,7 +1,9 @@
 import threading
 import socket
+import ssl
 import logging
 import sys
+import os
 
 from .. import packetparser
 from .. import packetexcluder
@@ -10,7 +12,7 @@ class Network():
 
     def __init__(self, options, bridge):
         """
-        Initialises an TCP network.
+        Initialises a TCP network.
 
         :param options: The options used to configure the TCP connection.
         :param bridge: Bridge object.
@@ -18,11 +20,61 @@ class Network():
 
         self.__logger = logging.getLogger("VelbusTCP")
 
-        # Check if options are valid
-        self.__port = int(options["port"])
+        ## Check if provided options are valid
 
+        # Port
+        if not "port" in options:
+            raise ValueError("No port provided")
+
+        self.__port = int(options["port"])
+        
         if (not (self.__port > 0 and self.__port < 65535)):
-            raise ValueError("The provided port is invalid {0}".format(options["port"]))
+            raise ValueError("The provided port is invalid {0}".format(self.__port))
+
+        # SSL
+        if "ssl" in options:
+
+            # SSL enabled/disabled
+            if (options["ssl"] != True) and (options["ssl"] != False):
+                raise ValueError("Provided option ssl is invalid {0}".format(options["ssl"]))
+
+            self.__ssl = options["ssl"]
+
+            if self.__ssl:
+
+                # PK
+                if (not "pk" in options) or (options["pk"] == "") or (not os.path.isfile(options["pk"])):
+                    raise ValueError("Provided private key not found or non given while SSL is enabled")
+
+                # Certificate
+                if (not "cert" in options) or (options["cert"] == "") or (not os.path.isfile(options["cert"])):
+                    raise ValueError("Provided certificate not found or non given while SSL is enabled")
+
+                self.__pk = options["pk"]
+                self.__cert = options["cert"]                
+
+        else:
+            self.__ssl = False
+
+        # Auth
+        if "auth" in options:
+
+            # Auth enabled/disabled
+            if (options["auth"] != True) and (options["auth"] != False):
+                raise ValueError("Provided option auth is invalid {0}".format(options["auth"]))
+
+            self.__auth = options["auth"]
+
+            if self.__auth:
+
+                if not ("auth_key" in options) or (options["auth_key"] == ""):
+                    raise ValueError("No auth key provided or is empty")
+
+                self.__auth_key = options["auth_key"]
+
+        else:
+            self.__auth = False
+
 
         self.__bridge = bridge
         self.__clients           = dict()
@@ -40,13 +92,16 @@ class Network():
 
         if self.is_active():
             with self.__clients_lock:
-                for c in self.__clients:
-                    try:
-                        if packetexcluder.should_accept(bytes, self.__clients[c]):
-                            c.sendall(bytes)
-                            self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in bytes))
-                    except:
-                        break
+                for connection in self.__clients:
+
+                    if self.__clients[connection]["authenticated"]:
+
+                        try:
+                            if packetexcluder.should_accept(bytes, self.__clients[connection]):
+                                connection.sendall(bytes)
+                                self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in bytes))
+                        except:
+                            break
 
 
     def send_exclude(self, bytes, client):
@@ -59,13 +114,17 @@ class Network():
 
         if self.is_active():
             with self.__clients_lock:
-                for c in self.__clients:
-                    if (c is not client):
-                        try:
-                            if packetexcluder.should_accept(bytes, self.__clients[c]):
-                                c.sendall(bytes)
-                        except:
-                            break
+
+                for connection in self.__clients:
+                   
+                    if (connection is not client):
+                        if self.__clients[connection]["authenticated"]:
+
+                            try:
+                                if packetexcluder.should_accept(bytes, self.__clients[connection]):
+                                    connection.sendall(bytes)
+                            except:
+                                break
 
 
     def __accept_sockets(self):
@@ -75,8 +134,20 @@ class Network():
 
         while self.is_active():
             try:
-                (conn, address) = self.__socket.accept()
-            except:
+
+                conn = None
+                ssock, address = self.__bind_socket.accept()
+
+                if self.__ssl:
+                    try:
+                        conn = self.__context.wrap_socket(ssock, server_side=True)
+                    except ssl.SSLError as e:
+                        print(e)
+                else:
+                    conn = ssock
+                
+            except Exception as e:
+                print(e)
                 break
 
             if self.is_active():
@@ -84,7 +155,12 @@ class Network():
 
                 # Add the connection to the connected clients set
                 with self.__clients_lock:
-                    self.__clients[conn] = address
+                    self.__clients[conn] = {
+                        "address": address,
+                        "authenticated": False if self.__auth else True,
+                    }
+
+                    print(self.__clients[conn])
 
                 # Start up a new client thread to handle the client communication
                 client_thread       = threading.Thread(target=self.__handle_client, args=(conn,))
@@ -97,7 +173,7 @@ class Network():
             for c in self.__clients:
                 c.shutdown(socket.SHUT_RDWR)
 
-        self.__socket.close()
+        self.__bind_socket.close()
         self.__logger.info("Closed TCP socket")
 
     def __handle_client(self, conn):
@@ -109,7 +185,15 @@ class Network():
 
         parser = packetparser.PacketParser()
 
-        while self.is_active():
+        # Handle authentication
+        if self.__auth:
+            auth_key = conn.recv(1024).decode("utf-8").strip()
+
+            if self.__auth_key == auth_key:
+                self.__clients[conn]["authenticated"] = True
+
+        while self.__clients[conn]["authenticated"] and self.is_active():
+
             try:
                 data = conn.recv(1024)
 
@@ -131,14 +215,19 @@ class Network():
                 self.__logger.exception(str(e))
                 break
 
-        # Remove the connection from the connected clients set
         address = self.__clients[conn]
+
+        # Warning message
+        if not self.__clients[conn]["authenticated"]:
+            self.__logger.info("TCP connection closed " + str(address) + " [auth failed]")
+        else:
+            self.__logger.info("TCP connection closed " + str(address))                
+
+        # Remove the connection from the connected clients set
         with self.__clients_lock:
             del self.__clients[conn]
 
         conn.close()
-
-        self.__logger.info("TCP connection closed " + str(address))
 
     def is_active(self):
         """
@@ -157,19 +246,16 @@ class Network():
 
         if self.is_active():
             return
-        
-        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__socket.bind(("", self.__port))
-        #try:
-        #   
 
-        #except socket.error as msg:
-        #    self.__logger.error("Could not bind to port {0}".format(self.__port))
-        #    self.__logger.error(msg)
-         #   sys.exit(1)  
+        self.__bind_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__bind_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)      
+        self.__bind_socket.bind(("", self.__port))
+        self.__bind_socket.listen(0)
+
+        if self.__ssl:
+            self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)       
+            self.__context.load_cert_chain(self.__cert, keyfile=self.__pk)
         
-        self.__socket.listen(0)
         self.__logger.info("Listening to TCP connections on " + str(self.__port))
 
         # Now that we reached here, set running

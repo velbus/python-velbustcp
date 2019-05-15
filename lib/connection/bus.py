@@ -25,7 +25,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
     def data_received(self, data):
         # pylint: disable-msg=E1101
-        #  buffer = bytearray(self.__serial_port.read(self.__serial_port.inWaiting()))
         self.__parser.feed(data)
 
         # Try to get a new packet in the parser
@@ -38,7 +37,8 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         # pylint: disable-msg=E1101
 
         if exc is not None:
-            self.bridge.on_bus_error(exc)
+            print(exc)
+            self.bridge.bus_error()
 
 class Bus():
 
@@ -58,7 +58,7 @@ class Bus():
         self.__send_buffer = collections.deque(maxlen=10000)
                
         self.__options = options
-        self.__bridge= bridge
+        self.__bridge = bridge
 
     def __write_thread(self):
         """
