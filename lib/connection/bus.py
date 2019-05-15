@@ -114,9 +114,9 @@ class Bus():
         devices = []
 
         for port in serial.tools.list_ports.comports():
-            try:
+            try:                
                 # Found, try open it first
-                if (port.hwid in PRODUCT_IDS):
+                if any(product_id in port.hwid for product_id in PRODUCT_IDS):
                     try_open_port = serial.Serial(port=port.device)
                     try_open_port.close()
                     devices.append(port.device)
@@ -154,8 +154,9 @@ class Bus():
 
         # If we need to autodiscover port
         if self.__options["autodiscover"]:
+           
             ports = self.__search_for_serial()
-
+            
             if len(ports) > 0:
                 self.__logger.info("Autodiscovered {0} port(s): {1}".format(len(ports), ports))
                 self.__logger.info("Choosing {0}".format(ports[0]))
