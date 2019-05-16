@@ -1,2 +1,2 @@
-def should_accept(packet, connection):
+def should_accept(packet, client):
     return True

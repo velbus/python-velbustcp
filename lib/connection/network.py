@@ -5,8 +5,8 @@ import logging
 import sys
 import os
 
-from .. import packetparser
-from .. import packetexcluder
+from .. import packetexcluder, settings
+from .client import Client
 
 class Network():
 
@@ -22,109 +22,54 @@ class Network():
 
         ## Check if provided options are valid
 
-        # Port
-        if not "port" in options:
-            raise ValueError("No port provided")
-
-        self.__port = int(options["port"])
-        
-        if (not (self.__port > 0 and self.__port < 65535)):
-            raise ValueError("The provided port is invalid {0}".format(self.__port))
-
-        # SSL
-        if "ssl" in options:
-
-            # SSL enabled/disabled
-            if (options["ssl"] != True) and (options["ssl"] != False):
-                raise ValueError("Provided option ssl is invalid {0}".format(options["ssl"]))
-
-            self.__ssl = options["ssl"]
-
-            if self.__ssl:
-
-                # PK
-                if (not "pk" in options) or (options["pk"] == "") or (not os.path.isfile(options["pk"])):
-                    raise ValueError("Provided private key not found or non given while SSL is enabled")
-
-                # Certificate
-                if (not "cert" in options) or (options["cert"] == "") or (not os.path.isfile(options["cert"])):
-                    raise ValueError("Provided certificate not found or non given while SSL is enabled")
-
-                self.__pk = options["pk"]
-                self.__cert = options["cert"]                
-
-        else:
-            self.__ssl = False
-
-        # Auth
-        if "auth" in options:
-
-            # Auth enabled/disabled
-            if (options["auth"] != True) and (options["auth"] != False):
-                raise ValueError("Provided option auth is invalid {0}".format(options["auth"]))
-
-            self.__auth = options["auth"]
-
-            if self.__auth:
-
-                if not ("auth_key" in options) or (options["auth_key"] == ""):
-                    raise ValueError("No auth key provided or is empty")
-
-                self.__auth_key = options["auth_key"]
-
-        else:
-            self.__auth = False
-
-
         self.__bridge = bridge
-        self.__clients           = dict()
-        self.__clients_lock      = threading.Lock()
+        self.__clients = []
+        self.__clients_lock = threading.Lock()
         self.__running = False 
         self.__options = options
         
 
-    def send(self, bytes):
+    def send(self, data):
         """
-        Sends given bytes to all connected clients
+        Sends given data to all connected clients
 
-        :param bytes: Specifies what bytes to send to the connected clients
+        :param data: Specifies what data to send to the connected clients
         """
+
+        self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in data))
 
         if self.is_active():
             with self.__clients_lock:
-                for connection in self.__clients:
+                for client in self.__clients:
 
-                    if self.__clients[connection]["authenticated"]:
+                    if client.is_authenticated():
 
                         try:
-                            if packetexcluder.should_accept(bytes, self.__clients[connection]):
-                                connection.sendall(bytes)
-                                self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in bytes))
+                            if packetexcluder.should_accept(data, client):
+                                client.send(data)
+                                
                         except:
-                            break
+                            continue
 
 
-    def send_exclude(self, bytes, client):
+    def send_exclude(self, data, exluded_client):
         """
-        Sends given bytes to all connected clients except the one specified as parameter
+        Sends given data to all connected clients except the one specified as parameter
 
-        :param bytes: Specifies what bytes to send to the connected clients
-        :param client: Specifies which client to skip sending the bytes to
+        :param data: Specifies what data to send to the connected clients
+        :param exluded_client: Specifies which client to skip sending the data to
         """
 
         if self.is_active():
             with self.__clients_lock:
 
-                for connection in self.__clients:
+                for client in self.__clients:
                    
-                    if (connection is not client):
-                        if self.__clients[connection]["authenticated"]:
-
-                            try:
-                                if packetexcluder.should_accept(bytes, self.__clients[connection]):
-                                    connection.sendall(bytes)
-                            except:
-                                break
+                    if (client is not exluded_client) and client.is_authenticated() and packetexcluder.should_accept(data, client):
+                        try:
+                            client.send(data)                        
+                        except:
+                            continue
 
 
     def __accept_sockets(self):
@@ -135,37 +80,29 @@ class Network():
         while self.is_active():
             try:
 
-                conn = None
+                connection = None
                 ssock, address = self.__bind_socket.accept()
 
-                if self.__ssl:
+                if settings.settings["tcp"]["ssl"]:
                     try:
-                        conn = self.__context.wrap_socket(ssock, server_side=True)
+                        connection = self.__context.wrap_socket(ssock, server_side=True)
                     except ssl.SSLError as e:
                         self.__logger.error("Couldn't wrap socket")
                         self.__logger.exception(str(e))
 
                 else:
-                    conn = ssock
+                    connection = ssock
                 
             except Exception as e:
                 self.__logger.error("Couldn't accept socket")
                 self.__logger.exception(str(e))
 
-            if conn:
+            if connection:
                 self.__logger.info("TCP connection from " + str(address))
+                client = Client(address, connection, self.__on_packet_received, self.__on_client_close)
 
-                # Add the connection to the connected clients set
                 with self.__clients_lock:
-                    self.__clients[conn] = {
-                        "address": address,
-                        "authenticated": False if self.__auth else True,
-                    }
-
-                # Start up a new client thread to handle the client communication
-                client_thread       = threading.Thread(target=self.__handle_client, args=(conn,))
-                client_thread.name  = 'TCP client thread'
-                client_thread.start()
+                    self.__clients.append(client)   
 
         # Call an explicit shutdown on all connected clients
         # This will cancel their recv methods
@@ -176,62 +113,19 @@ class Network():
         self.__bind_socket.close()
         self.__logger.info("Closed TCP socket")
 
-    def __handle_client(self, conn):
-        """
-        Handles client communication
+    def __on_packet_received(self, client, packet):
 
-        @param conn: The connection to handle
-        """
+        # Make sure we should accept the packet
+        if packetexcluder.should_accept(packet, self):
+            self.__bridge.tcp_packet_received(client, packet)
 
-        parser = packetparser.PacketParser()
-
-        # Handle authentication
-        print("Should auth: " + str(self.__auth))
-        if self.__auth:
-            auth_key = conn.recv(1024).decode("utf-8").strip()
-
-            if self.__auth_key == auth_key:
-                self.__clients[conn]["authenticated"] = True
-
-        # Receive data
-        while self.__clients[conn]["authenticated"] and self.is_active():
-
-            print("Recv data")
-
-            try:
-                data = conn.recv(1024)
-
-                # If program gets here without data, the client disconnected
-                if not data:
-                    break
-
-                parser.feed(bytearray(data))
-                packet = parser.next()
-                while packet is not None:
-
-                    # Make sure we should accept the packet
-                    if packetexcluder.should_accept(packet, self.__clients[conn]):
-                        self.__bridge.tcp_packet_received(conn, packet)
-                    
-                    packet = parser.next()
-
-            except Exception as e:
-                self.__logger.exception(str(e))
-                break
-
-        address = self.__clients[conn]
+    def __on_client_close(self, client):
 
         # Warning message
-        if not self.__clients[conn]["authenticated"]:
-            self.__logger.info("TCP connection closed " + str(address) + " [auth failed]")
+        if settings.settings["tcp"]["auth"] and not client.is_authenticated():
+            self.__logger.info("TCP connection closed " + str(client.address()) + " [auth failed]")
         else:
-            self.__logger.info("TCP connection closed " + str(address))                
-
-        # Remove the connection from the connected clients set
-        with self.__clients_lock:
-            del self.__clients[conn]
-
-        conn.close()
+            self.__logger.info("TCP connection closed " + str(client.address()))       
 
     def is_active(self):
         """
@@ -253,14 +147,14 @@ class Network():
 
         self.__bind_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__bind_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)      
-        self.__bind_socket.bind(("", self.__port))
+        self.__bind_socket.bind(("", settings.settings["tcp"]["port"]))
         self.__bind_socket.listen(0)
 
-        if self.__ssl:
+        if settings.settings["tcp"]["ssl"]:
             self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)       
-            self.__context.load_cert_chain(self.__cert, keyfile=self.__pk)
+            self.__context.load_cert_chain(settings.settings["tcp"]["cert"], keyfile=settings.settings["tcp"]["pk"])
         
-        self.__logger.info("Listening to TCP connections on " + str(self.__port))
+        self.__logger.info("Listening to TCP connections on " + str(settings.settings["tcp"]["port"]))
 
         # Now that we reached here, set running
         self.__running = True
@@ -284,7 +178,7 @@ class Network():
 
             # Connect to itself to stop the blocking accept
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", self.__port))
+            s.connect(("127.0.0.1", settings.settings["tcp"]["port"]))
 
             # Wait till the server thread is closed
             self.__server_thread.join()
