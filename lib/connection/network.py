@@ -142,13 +142,15 @@ class Network():
                     try:
                         conn = self.__context.wrap_socket(ssock, server_side=True)
                     except ssl.SSLError as e:
-                        self.__logger.err("Coudln't wrap socket: " + str(e))
+                        self.__logger.error("Couldn't wrap socket")
+                        self.__logger.exception(str(e))
 
                 else:
                     conn = ssock
                 
             except Exception as e:
-                self.__logger.err("Error accepting socket: " + str(e))
+                self.__logger.error("Couldn't accept socket")
+                self.__logger.exception(str(e))
 
             if conn:
                 self.__logger.info("TCP connection from " + str(address))
@@ -184,13 +186,17 @@ class Network():
         parser = packetparser.PacketParser()
 
         # Handle authentication
+        print("Should auth: " + str(self.__auth))
         if self.__auth:
             auth_key = conn.recv(1024).decode("utf-8").strip()
 
             if self.__auth_key == auth_key:
                 self.__clients[conn]["authenticated"] = True
 
+        # Receive data
         while self.__clients[conn]["authenticated"] and self.is_active():
+
+            print("Recv data")
 
             try:
                 data = conn.recv(1024)
