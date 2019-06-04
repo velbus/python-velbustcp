@@ -12,7 +12,7 @@ from .. import packetparser
 SEND_DELAY  = 0.05
 READ_DELAY  = 0.01
 
-PRODUCT_IDS = ['VID:PID=10CF:0B1B', 'VID:PID=10CF:0516']
+PRODUCT_IDS = ['VID:PID=10CF:0B1B', 'VID:PID=10CF:0516', 'VID:PID=10CF:0517', 'VID:PID=10CF:0518']
 
 class VelbusSerialProtocol(serial.threaded.Protocol):
     """
