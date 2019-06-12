@@ -2,6 +2,7 @@
 	"connections": 
 	{
 		{
+			"host": "",
 			"port": 27015,
 			"relay": true,
 			"ssl": true,

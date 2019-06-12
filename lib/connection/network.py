@@ -5,9 +5,8 @@ import logging
 import sys
 import os
 
-from .. import packetexcluder, settings
+from .. import packetexcluder
 from .client import Client
-from .bridge import Bridge
 
 class Network():
 
@@ -19,29 +18,33 @@ class Network():
         :param bridge: Bridge object.
         """
 
-        assert isinstance(bridge, Bridge)
-
         self.__logger = logging.getLogger("VelbusTCP")
-
-        ## Check if provided options are valid
 
         self.__bridge = bridge
         self.__clients = []
         self.__clients_lock = threading.Lock()
         self.__running = False 
-        self.__options = options  
+        self.__options = options
 
     def relay(self):
-        return self.__options["relay"]      
+        return self.__options["relay"]    
 
-    def send(self, data):
+
+    def address(self):
+        return (self.__options["host"], self.__options["port"])
+
+    def send(self, data, excluded_client=None):
         """
-        Sends given data to all connected clients
+        Sends given data to all connected clients to the network. If excluded_client is supplied, will skip given excluded_client.
 
         :param data: Specifies what data to send to the connected clients
+        :param excluded_client: Specifies which client to skip sending the data to
         """
 
         assert isinstance(data, bytearray)
+
+        if excluded_client:    
+            assert isinstance(excluded_client, Client)
 
         self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in data))
 
@@ -52,47 +55,22 @@ class Network():
                     if client.is_active():
 
                         try:
-                            if packetexcluder.should_accept(data, client):
+                            if (client != excluded_client) and packetexcluder.should_accept(data, client):
                                 client.send(data)
-                                
                         except:
                             continue
 
-
-    def send_exclude(self, data, exluded_client):
-        """
-        Sends given data to all connected clients except the one specified as parameter
-
-        :param data: Specifies what data to send to the connected clients
-        :param exluded_client: Specifies which client to skip sending the data to
-        """
-
-        assert isinstance(data, bytearray)
-        assert isinstance(exluded_client, Client)
-
-        if self.is_active():
-            with self.__clients_lock:
-
-                for client in self.__clients:
-                   
-                    if (client is not exluded_client) and client.is_authenticated() and packetexcluder.should_accept(data, client):
-                        try:
-                            client.send(data)                        
-                        except:
-                            continue
-
-
-    def __accept_sockets(self, binding_socket, ssl=False, authorize=False, authorize_key=""):
+    def __accept_sockets(self, ssl=False, authorize=False, authorize_key=""):
         """
         Accepts clients from given socket, if the tcp server is closed it will also close socket
         """
 
-        assert isinstance(binding_socket, socket.socket)
+        assert isinstance(self.__bind_socket, socket.socket)
 
         while self.is_active():
 
             try:
-                connection, address = binding_socket.accept()
+                connection, address = self.__bind_socket.accept()
 
                 if self.is_active():
 
@@ -121,7 +99,7 @@ class Network():
                 self.__logger.error("Couldn't accept socket")
                 self.__logger.exception(str(e))     
            
-        binding_socket.close()
+        self.__bind_socket.close()
         self.__logger.info("Closed TCP socket")
 
     def __on_packet_received(self, client, packet):
@@ -130,7 +108,7 @@ class Network():
         assert isinstance(packet, bytearray)
 
         # Make sure we should accept the packet
-        if packetexcluder.should_accept(packet, self):
+        if packetexcluder.should_accept(packet, client):
             self.__bridge.tcp_packet_received(self, client, packet)
 
     def __on_client_close(self, client):
@@ -138,7 +116,7 @@ class Network():
         assert isinstance(client, Client)
 
         # Warning message
-        if settings.settings["tcp"]["auth"] and not client.is_authenticated():
+        if self.__options["auth"] and not client.is_authenticated():
             self.__logger.info("TCP connection closed " + str(client.address()) + " [auth failed]")
         else:
             self.__logger.info("TCP connection closed " + str(client.address()))       
@@ -155,7 +133,6 @@ class Network():
     def start(self):
         """
         Starts up the TCP server
-
         """
 
         if self.is_active():
@@ -163,14 +140,14 @@ class Network():
 
         self.__bind_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__bind_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)      
-        self.__bind_socket.bind(("", settings.settings["tcp"]["port"]))
+        self.__bind_socket.bind((self.__options["host"], self.__options["port"]))
         self.__bind_socket.listen(0)
 
-        if settings.settings["tcp"]["ssl"]:
+        if self.__options["ssl"]:
             self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)       
-            self.__context.load_cert_chain(settings.settings["tcp"]["cert"], keyfile=settings.settings["tcp"]["pk"])
+            self.__context.load_cert_chain(self.__options["cert"], keyfile=self.__options["pk"])
         
-        self.__logger.info("Listening to TCP connections on " + str(settings.settings["tcp"]["port"]))
+        self.__logger.info("Listening to TCP connections on " + str(self.__options["port"]))
 
         # Now that we reached here, set running
         self.__running = True
@@ -199,7 +176,7 @@ class Network():
 
             # Connect to itself to stop the blocking accept
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", settings.settings["tcp"]["port"]))
-
+            s.connect(("127.0.0.1", self.__options["port"]))
+                
             # Wait till the server thread is closed
             self.__server_thread.join()

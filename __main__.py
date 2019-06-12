@@ -4,6 +4,7 @@ from threading import Event
 import logging
 import logging.handlers
 import os
+import ipaddress
 
 from lib.connection.bridge import Bridge
 import lib.settings
@@ -15,7 +16,7 @@ class Main():
     Connects serial and TCP connection together.
     """
 
-    def __init__(self, settings):
+    def __init__(self):
         """
         Initialises the main class.
         """
@@ -24,7 +25,7 @@ class Main():
         self.__logger = logging.getLogger("VelbusTCP")
 
         # Bridge
-        self.__bridge = Bridge(settings)    
+        self.__bridge = Bridge()    
         self.__bridge.start()    
    
 
@@ -67,14 +68,20 @@ def setup_logging():
 
 def set_default_settings():
     
-    lib.settings.settings["tcp"] = dict()
-    lib.settings.settings["tcp"]["port"] = 27015
-    lib.settings.settings["tcp"]["relay"] = True
-    lib.settings.settings["tcp"]["ssl"] = False
-    lib.settings.settings["tcp"]["pk"] = ""
-    lib.settings.settings["tcp"]["cert"] = ""
-    lib.settings.settings["tcp"]["auth"] = False
-    lib.settings.settings["tcp"]["authkey"] = ""    
+    lib.settings.settings["connections"] = []
+
+    default_conn = {}
+    default_conn["host"] = ""
+    default_conn["port"] = 27015
+    default_conn["relay"] = True
+    
+    default_conn["ssl"] = False
+    default_conn["pk"] = ""
+    default_conn["cert"] = ""
+    
+    default_conn["auth"] = False
+    default_conn["authkey"] = ""    
+    lib.settings.settings["connections"].append(default_conn)
 
     lib.settings.settings["serial"] = dict()
     lib.settings.settings["serial"]["autodiscover"] = True
@@ -89,18 +96,35 @@ def validate_settings(settings):
     # Has connection(s)
     if "connections" in settings:
 
-        lib.settings.settings["connections"] = {}
+        lib.settings.settings["connections"] = []
 
         for connection in settings["connections"]:
 
-            conn_dict = {}            
+            conn_dict = {}  
+
+            # Host
+            if "host" in connection:
+                conn_dict["host"] = connection["host"]
+
+                # Make sure host is empty (all), or a valid IPv4/IPv6
+                if conn_dict["host"] != "":
+                    ipaddress.ip_address(conn_dict["host"])
 
             # Port
-            if "port" in connection["tcp"]:
+            if "port" in connection:
             
                 conn_dict["port"] = int(connection["port"])
                 if (conn_dict["port"] < 0) or (conn_dict["port"] > 65535):
                     raise ValueError("The provided port is invalid {0}".format(conn_dict["port"]))
+
+            # SSL
+            if "relay" in connection:
+
+                # Relay enabled/disabled
+                if (connection["relay"] != True) and (connection["relay"] != False):
+                    raise ValueError("Provided option for relay is invalid {0}".format(connection["relay"]))                    
+            
+                conn_dict["relay"] = connection["relay"]                 
 
             # SSL
             if "ssl" in connection:
@@ -145,6 +169,8 @@ def validate_settings(settings):
     # Serial
     if "serial" in settings:
 
+        lib.settings.settings["serial"] = dict()
+
         # Port
         if "port" in settings["serial"]:
             lib.settings.settings["serial"]["port"] = settings["serial"]["port"]
@@ -160,6 +186,8 @@ def validate_settings(settings):
 
     # Logging
     if "logging" in settings:
+
+        lib.settings.settings["logging"] = dict()
         
         if ("type" in settings["logging"]):
             
@@ -178,11 +206,8 @@ def validate_settings(settings):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Velbus communication")
-    parser.add_argument("--settings", help="Settings file", required=False, default="settings.json")
-    args = parser.parse_args()
-
-    # Set default settings
-    set_default_settings()
+    parser.add_argument("--settings", help="Settings file", required=False)
+    args = parser.parse_args()   
 
     # If settings are supplied, read and validate them
     if args.settings:
@@ -192,12 +217,16 @@ if __name__ == '__main__':
             settings = json.load(f)
 
         validate_settings(settings)
+    
+    else:
+        # Set default settings
+        set_default_settings()
 
     # Setup logging
     logger = setup_logging()   
 
     # Create main class
-    main = Main(settings)
+    main = Main()
 
     try:
         main.main_loop()

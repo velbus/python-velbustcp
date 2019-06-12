@@ -6,6 +6,7 @@ import collections
 import time
 from datetime import datetime
 import logging
+import traceback
 
 from .. import packetparser
 
@@ -25,20 +26,28 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
     def data_received(self, data):
         # pylint: disable-msg=E1101
-        self.__parser.feed(data)
+        
+        d = bytearray(data)
+        self.__parser.feed(d)
 
         # Try to get a new packet in the parser
         packet = self.__parser.next()
+        
         while packet:
-            self.bridge.bus_packet_received(packet)
+            self.bridge.bus_packet_received(packet)   
             packet = self.__parser.next()
 
     def connection_lost(self, exc):
         # pylint: disable-msg=E1101
 
+        print(exc)
+
+        if exc:
+            traceback.print_exc(exc)
+
         if exc is not None:
             print(exc)
-            self.bridge.bus_error()
+            self.on_error()
 
 class Bus():
 
@@ -102,7 +111,6 @@ class Bus():
         """
 
         self.__in_error = True
-        self.__bridge.bus_error()
 
     def __search_for_serial(self):
         """
@@ -195,6 +203,7 @@ class Bus():
         self._reader = serial.threaded.ReaderThread(self.__serial_port, VelbusSerialProtocol)
         self._reader.start()
         self._reader.protocol.bridge = self.__bridge
+        self._reader.protocol.on_error = self.__on_error
         self._reader.connect()
 
         # Create write thread
@@ -215,7 +224,10 @@ class Bus():
             self.__logger.info("Stopping serial connection")
 
             self.__connected = False
-            self._reader.close()
+
+            if not self.in_errror():
+                self._reader.close()
+
             self.__send_event.set()
             self.__send_thread.join()
 

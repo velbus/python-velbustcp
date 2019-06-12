@@ -4,6 +4,7 @@ import time
 from .bus import Bus
 from .network import Network
 from .client import Client
+from .. import settings
 
 class Bridge():
     """
@@ -12,7 +13,7 @@ class Bridge():
     Connects serial and TCP connection(s) together.
     """
 
-    def __init__(self, settings):
+    def __init__(self):
         """
         Initialises the Bridge class.
         """
@@ -20,14 +21,14 @@ class Bridge():
         # Logger
         self.__logger = logging.getLogger("VelbusTCP")
 
-        self.__settings = settings
+        self.__settings = settings.settings
 
         # Create bus
-        self.__bus = Bus(options=settings["serial"], bridge=self)
+        self.__bus = Bus(options=self.__settings["serial"], bridge=self)
 
         # Create network connection(s)
         self.__networks = []
-        for connection in settings["connections"]:
+        for connection in self.__settings["connections"]:
             self.__networks.append(Network(options=connection, bridge=self))
         
     def start(self):
@@ -93,10 +94,10 @@ class Bridge():
             if n.is_active():
 
                 # Relay to other TCP clients?
-                if (network == n) and not network.relay():
+                if not network.relay():
                     continue
             
-                network.send_exclude(packet, client)
+                n.send(packet, client)
 
         if self.__bus.is_active():
             self.__bus.send(packet)        

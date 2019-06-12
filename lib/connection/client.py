@@ -50,7 +50,6 @@ class Client():
 
             self.__on_close(self)
 
-
     def send(self, data):
         """
         Sends data to the client.
@@ -78,6 +77,9 @@ class Client():
             return self.__authorized
     
     def is_active(self):
+        """
+        Returns whether the client is active for communication. If applicable, this also means that the client is authenticated.
+        """
         return self.__is_active
     
     def address(self):
@@ -100,11 +102,13 @@ class Client():
 
             if self.__authorize_key == auth_key:
                 self.__authorized = True
+                self.__is_active = True
 
-        self.__is_active = True      
+        else:
+            self.__is_active = True      
 
         # Receive data
-        while self.is_authorized() and self.is_active():
+        while self.is_active():
 
             try:
                 data = self.__connection.recv(1024)

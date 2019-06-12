@@ -7,13 +7,13 @@ from . import consts
 STX                 = 0x0F
 ETX                 = 0x04
 LENGTH_MASK         = 0x0F
+HEADER_LENGTH       = 3         # Header: [STX, priority, address, RTR+data length]
 MAX_DATA_AMOUNT     = 8         # Maximum amount of data bytes in a packet
-MIN_PACKET_LENGTH   = 6         # Smallest possible packet: [stx, address, firmware+data length, command, crc, etx]
+MIN_PACKET_LENGTH   = 6         # Smallest possible packet: [STX, priority, address, RTR+data length, command, CRC, ETC]
 
 class PacketParser:
     """
     Packet parser for the Velbus protocol.
-
     The packet protocol is detailed at https://github.com/velbus/packetprotocol.
     """
 
@@ -31,14 +31,14 @@ class PacketParser:
 
         amount = 1
 
-        while ((amount < len(self.buffer)) and (self.buffer[amount] != STX)):
+        while (amount < len(self.buffer)) and (self.buffer[amount] != STX):
             amount += 1
 
         self.__shift_buffer(amount)
 
     def __shift_buffer(self, amount):
         """
-        Shifts the buffer by the specified amount
+        Shifts the buffer by the specified amount.
 
         :param amount: The amount of bytes that the buffer needs to be shifted.
         """
@@ -55,11 +55,15 @@ class PacketParser:
         :return: A boolean indicating whether or not the parser has a valid packet header waiting.
         """
 
-        startValid      = self.buffer[0] == STX
-        bodySizeValid   = self.__curr_packet_body_length() <= MAX_DATA_AMOUNT
-        priorityValid   = self.buffer[1] in consts.PRIORITIES
+        # Shortcut if the buffer isn't large enough to have a header
+        if len(self.buffer) < HEADER_LENGTH:
+            return False
 
-        return startValid and bodySizeValid and priorityValid
+        start_valid      = self.buffer[0] == STX
+        bodysize_valid   = self.__curr_packet_body_length() <= MAX_DATA_AMOUNT
+        priority_valid   = self.buffer[1] in consts.PRIORITIES
+
+        return start_valid and bodysize_valid and priority_valid
 
     def __checksum(self, arr):
         """
@@ -67,7 +71,7 @@ class PacketParser:
 		The checksum is calculated by summing all values in an array, then performing the two's complement.
 
         :param arr: The array of bytes of which the checksum has to be calculated of.
-        :return: The checksum.
+        :return: The checksum of the given array.
         """
 
         assert isinstance(arr, bytearray)
@@ -81,10 +85,22 @@ class PacketParser:
 
     def __has_valid_packet_waiting(self):
         """
-        Checks whether or not the parser has a valid packet waiting.
+        Checks whether or not the parser has a valid packet in its buffer.
 
-        :return: A boolean indicating whether or not the parser has a valid packet waiting.
+        :return: A boolean indicating whether or not the parser has a valid packet in its buffer.
         """
+
+        # Make sure that the header in the packet is valid
+        if not self.__has_valid_header_waiting():
+            return False
+
+        # Shortcut if we don't have enough bytes in the buffer to have a valid packet
+        if len(self.buffer) < MIN_PACKET_LENGTH:
+            return False        
+        
+        # Shortcut if we don't have enough bytes to complete the packet length specified in body
+        if len(self.buffer) < self.__curr_packet_length():
+            return False
 
         bytes_to_check  = bytearray(itertools.islice(self.buffer, 0, 4 + self.__curr_packet_body_length()))
         checksum_valid  = self.buffer[self.__curr_packet_length() - 2] == self.__checksum(bytes_to_check)
@@ -95,8 +111,7 @@ class PacketParser:
     def __curr_packet_length(self):
         """
         Gets the current waiting packet's total length.
-
-        This should only be called when there's at least 4 bytes in the parser.
+        This should only be called when __has_valid_header_waiting() returns True.
 
         :return: The current waiting packet's total length.
         """
@@ -106,8 +121,7 @@ class PacketParser:
     def __curr_packet_body_length(self):
         """
         Gets the current waiting packet's body length.
-
-        This should only be called when there's at least 4 bytes in the parser.
+        This should only be called when __has_valid_header_waiting() returns True.
 
         :return: The current waiting packet's body length.
         """
@@ -117,8 +131,7 @@ class PacketParser:
     def __extract_packet(self):
         """
         Extracts a packet from the buffer and shifts it.
-
-        Make sure this is only called after __has_valid_packet_waiting returns True.
+        Make sure this is only called after __has_valid_packet_waiting() return True.
 
         :return: A bytearray with the currently waiting packet.
         """
@@ -135,7 +148,7 @@ class PacketParser:
 
         :param array: The data that will be added to the parser.
         """
-
+        
         assert isinstance(array, bytearray)
 
         self.buffer.extend(array)
@@ -143,7 +156,6 @@ class PacketParser:
     def next(self):
         """
         Attempts to get a packet from the parser.
-
         This is a safe operation if there are no packets waiting in the parser.
 
         :return: Will return a bytearray if there is a packet present, None if there is no packet available.
@@ -151,21 +163,14 @@ class PacketParser:
 
         packet = None
 
-        # Check until we have a valid header waiting of until we don't have anything left in buffer
-        while ((len(self.buffer) >= MIN_PACKET_LENGTH) and (not self.__has_valid_header_waiting())):
+        # Check if we have a valid packet until we don't have anything left in buffer
+        has_valid_packet = self.__has_valid_packet_waiting()
+        while (len(self.buffer) > HEADER_LENGTH) and not has_valid_packet:
             self.__realign_buffer()
+            has_valid_packet = self.__has_valid_packet_waiting()
 
-        # We have a valid header waiting
-        if ((len(self.buffer) >= MIN_PACKET_LENGTH) and self.__has_valid_header_waiting()):
-
-            # We have enough bytes in the buffer to continue
-            if (len(self.buffer) >= self.__curr_packet_length()):
-
-                # We have a valid body waiting
-                if (self.__has_valid_packet_waiting()):
-                    packet = self.__extract_packet()
-
-                else:
-                    self.__realign_buffer()
+        # If we have a valid packet, extract it
+        if has_valid_packet:
+            packet = self.__extract_packet()   
 
         return packet
