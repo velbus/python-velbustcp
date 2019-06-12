@@ -86,54 +86,61 @@ def set_default_settings():
 
 def validate_settings(settings):
 
-    # TCP
-    if "tcp" in settings:
-        
-        # Port
-        if "port" in settings["tcp"]:
-           
-            lib.settings.settings["tcp"]["port"] = int(settings["tcp"]["port"])
-            if (lib.settings.settings["tcp"]["port"] < 0) or (lib.settings.settings["tcp"]["port"] > 65535):
-                raise ValueError("The provided port is invalid {0}".format(lib.settings.settings["tcp"]["port"]))
+    # Has connection(s)
+    if "connections" in settings:
 
-        # SSL
-        if "ssl" in settings["tcp"]:
+        lib.settings.settings["connections"] = {}
 
-            # SSL enabled/disabled
-            if (settings["tcp"]["ssl"] != True) and (settings["tcp"]["ssl"] != False):
-                raise ValueError("Provided option ssl is invalid {0}".format(settings["tcp"]["ssl"]))
+        for connection in settings["connections"]:
 
-            if settings["tcp"]["ssl"]:
+            conn_dict = {}            
 
-                # PK
-                if (not "pk" in settings["tcp"]) or (settings["tcp"]["pk"] == "") or (not os.path.isfile(settings["tcp"]["pk"])):
-                    raise ValueError("Provided private key not found or non given while SSL is enabled")
+            # Port
+            if "port" in connection["tcp"]:
+            
+                conn_dict["port"] = int(connection["port"])
+                if (conn_dict["port"] < 0) or (conn_dict["port"] > 65535):
+                    raise ValueError("The provided port is invalid {0}".format(conn_dict["port"]))
 
-                # Certificate
-                if (not "cert" in settings["tcp"]) or (settings["tcp"]["cert"] == "") or (not os.path.isfile(settings["tcp"]["cert"])):
-                    raise ValueError("Provided certificate not found or non given while SSL is enabled")
+            # SSL
+            if "ssl" in connection:
 
-                lib.settings.settings["tcp"]["pk"] = settings["tcp"]["pk"] 
-                lib.settings.settings["tcp"]["cert"] = settings["tcp"]["cert"]                    
+                # SSL enabled/disabled
+                if (connection["ssl"] != True) and (connection["ssl"] != False):
+                    raise ValueError("Provided option ssl is invalid {0}".format(connection["ssl"]))
 
-            lib.settings.settings["tcp"]["ssl"] = settings["tcp"]["ssl"]       
-        
+                if connection["ssl"]:
 
-        # Auth
-        if "auth" in settings["tcp"]:
+                    # PK
+                    if (not "pk" in connection) or (connection["pk"] == "") or (not os.path.isfile(connection["pk"])):
+                        raise ValueError("Provided private key not found or non given while SSL is enabled")
 
-            # Auth enabled/disabled
-            if (settings["tcp"]["auth"] != True) and (settings["tcp"]["auth"] != False):
-                raise ValueError("Provided option auth is invalid {0}".format(settings["tcp"]["auth"]))
+                    # Certificate
+                    if (not "cert" in connection) or (connection["cert"] == "") or (not os.path.isfile(connection["cert"])):
+                        raise ValueError("Provided certificate not found or non given while SSL is enabled")
 
-            lib.settings.settings["tcp"]["auth"] = settings["tcp"]["auth"]      
+                    conn_dict["pk"] = connection["pk"] 
+                    conn_dict["cert"] = connection["cert"]                    
 
-            if settings["tcp"]["auth"]:
+                conn_dict["ssl"] = connection["ssl"]       
+            
+            # Auth
+            if "auth" in connection:
 
-                if not ("auth_key" in settings["tcp"]) or (settings["tcp"]["auth_key"] == ""):
-                    raise ValueError("No auth key provided or is empty")
+                # Auth enabled/disabled
+                if (connection["auth"] != True) and (connection["auth"] != False):
+                    raise ValueError("Provided option auth is invalid {0}".format(connection["auth"]))
 
-                lib.settings.settings["tcp"]["authkey"] = settings["tcp"]["auth_key"]                        
+                conn_dict["auth"] = connection["auth"]      
+
+                if connection["auth"]:
+
+                    if not ("auth_key" in connection) or (connection["auth_key"] == ""):
+                        raise ValueError("No auth key provided or is empty")
+
+                    conn_dict["authkey"] = connection["auth_key"]                        
+
+            lib.settings.settings["connections"].append(conn_dict)
 
     # Serial
     if "serial" in settings:

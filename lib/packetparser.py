@@ -14,7 +14,7 @@ class PacketParser:
     """
     Packet parser for the Velbus protocol.
 
-    The packet protocol is detailed at https://github.com/Velbus/packetprotocol.
+    The packet protocol is detailed at https://github.com/velbus/packetprotocol.
     """
 
     def __init__(self):
@@ -43,6 +43,8 @@ class PacketParser:
         :param amount: The amount of bytes that the buffer needs to be shifted.
         """
 
+        assert isinstance(amount, int)
+
         for _ in itertools.repeat(None, amount):
             self.buffer.popleft()
 
@@ -67,6 +69,8 @@ class PacketParser:
         :param arr: The array of bytes of which the checksum has to be calculated of.
         :return: The checksum.
         """
+
+        assert isinstance(arr, bytearray)
 
         crc = sum(arr)
         crc = crc ^ 0xFF
@@ -131,6 +135,8 @@ class PacketParser:
 
         :param array: The data that will be added to the parser.
         """
+
+        assert isinstance(array, bytearray)
 
         self.buffer.extend(array)
 

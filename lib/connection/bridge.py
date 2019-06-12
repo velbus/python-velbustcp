@@ -3,12 +3,13 @@ import time
 
 from .bus import Bus
 from .network import Network
+from .client import Client
 
 class Bridge():
     """
     Bridge class for the Velbus-TCP connection.
 
-    Connects serial and TCP connection together.
+    Connects serial and TCP connection(s) together.
     """
 
     def __init__(self, settings):
@@ -21,13 +22,17 @@ class Bridge():
 
         self.__settings = settings
 
-        # Create bus and TCP server
+        # Create bus
         self.__bus = Bus(options=settings["serial"], bridge=self)
-        self.__network = Network(options=settings["tcp"], bridge=self)
+
+        # Create network connection(s)
+        self.__networks = []
+        for connection in settings["connections"]:
+            self.__networks.append(Network(options=connection, bridge=self))
         
     def start(self):
         """
-        Starts bus and when succesful, starts network.
+        Starts bus and when succesful, starts TCP network(s).
         """
 
         while not self.__bus.is_active():
@@ -38,7 +43,8 @@ class Bridge():
                 self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
                 time.sleep(5)
 
-        self.__network.start()
+        for network in self.__networks:
+            network.start()
 
     def bus_error(self):
         """
@@ -57,27 +63,43 @@ class Bridge():
         :param packet: The received packet on the serial connection.
         """
 
+        assert isinstance(packet, bytearray)
+
         self.__logger.debug("[BUS IN] " + " ".join(hex(x) for x in packet))
 
-        if (self.__network.is_active()):
-            self.__network.send(packet)
+        for network in self.__networks:
+            if network.is_active():
+                network.send(packet)
 
-    def tcp_packet_received(self, client, packet):
+    def tcp_packet_received(self, network, client, packet):
         """
-        Called when the TCP server receives a packet from a client.
+        Called when a network receives a packet from a client.
 
+        :param network: Network which received the packet
         :param client: Client which sent the packet
         :param packet: Packet received from the client
         """
 
+        assert isinstance(network, Network)
+        assert isinstance(client, Client)
+        assert isinstance(packet, bytearray)
+
+        #TODO: Only send to network if bus is active?
+
         self.__logger.debug("[TCP IN] " + " ".join(hex(x) for x in packet))
 
-        # Relay to other TCP clients?
-        if (self.__settings["tcp"]["relay"] and self.__network.is_active()):
-            self.__network.send_exclude(packet, client)
+        for n in self.__networks:
 
-        if (self.__bus.is_active()):
-            self.__bus.send(packet)
+            if n.is_active():
+
+                # Relay to other TCP clients?
+                if (network == n) and not network.relay():
+                    continue
+            
+                network.send_exclude(packet, client)
+
+        if self.__bus.is_active():
+            self.__bus.send(packet)        
 
     def stop(self):
         """
@@ -85,4 +107,6 @@ class Bridge():
         """
 
         self.__bus.stop()
-        self.__network.stop()
+
+        for network in self.__networks:
+            network.stop()

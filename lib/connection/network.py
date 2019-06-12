@@ -7,6 +7,7 @@ import os
 
 from .. import packetexcluder, settings
 from .client import Client
+from .bridge import Bridge
 
 class Network():
 
@@ -18,6 +19,8 @@ class Network():
         :param bridge: Bridge object.
         """
 
+        assert isinstance(bridge, Bridge)
+
         self.__logger = logging.getLogger("VelbusTCP")
 
         ## Check if provided options are valid
@@ -26,8 +29,10 @@ class Network():
         self.__clients = []
         self.__clients_lock = threading.Lock()
         self.__running = False 
-        self.__options = options
-        
+        self.__options = options  
+
+    def relay(self):
+        return self.__options["relay"]      
 
     def send(self, data):
         """
@@ -36,13 +41,15 @@ class Network():
         :param data: Specifies what data to send to the connected clients
         """
 
+        assert isinstance(data, bytearray)
+
         self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in data))
 
         if self.is_active():
             with self.__clients_lock:
                 for client in self.__clients:
 
-                    if client.is_authenticated():
+                    if client.is_active():
 
                         try:
                             if packetexcluder.should_accept(data, client):
@@ -60,6 +67,9 @@ class Network():
         :param exluded_client: Specifies which client to skip sending the data to
         """
 
+        assert isinstance(data, bytearray)
+        assert isinstance(exluded_client, Client)
+
         if self.is_active():
             with self.__clients_lock:
 
@@ -72,54 +82,60 @@ class Network():
                             continue
 
 
-    def __accept_sockets(self):
+    def __accept_sockets(self, binding_socket, ssl=False, authorize=False, authorize_key=""):
         """
-        Creates a socket and accepts clients, if the tcp server is closed it will also close socket
+        Accepts clients from given socket, if the tcp server is closed it will also close socket
         """
+
+        assert isinstance(binding_socket, socket.socket)
 
         while self.is_active():
+
             try:
+                connection, address = binding_socket.accept()
 
-                connection = None
-                ssock, address = self.__bind_socket.accept()
+                if self.is_active():
 
-                if settings.settings["tcp"]["ssl"]:
-                    try:
-                        connection = self.__context.wrap_socket(ssock, server_side=True)
-                    except ssl.SSLError as e:
-                        self.__logger.error("Couldn't wrap socket")
-                        self.__logger.exception(str(e))
+                    self.__logger.info("TCP connection from " + str(address))
 
-                else:
-                    connection = ssock
+                    if ssl:
+                        
+                        try:
+                            return self.__context.wrap_socket(connection, server_side=True)
+
+                        except ssl.SSLError as e:
+                            self.__logger.error("Couldn't wrap socket")
+                            raise e
+
+                    client = Client(connection, self.__on_packet_received, self.__on_client_close)
+
+                    if authorize:
+                        client.set_should_authorize(authorize_key)
+
+                    client.start()
+
+                    with self.__clients_lock:
+                        self.__clients.append(client)                   
                 
             except Exception as e:
                 self.__logger.error("Couldn't accept socket")
-                self.__logger.exception(str(e))
-
-            if connection:
-                self.__logger.info("TCP connection from " + str(address))
-                client = Client(address, connection, self.__on_packet_received, self.__on_client_close)
-
-                with self.__clients_lock:
-                    self.__clients.append(client)   
-
-        # Call an explicit shutdown on all connected clients
-        # This will cancel their recv methods
-        with self.__clients_lock:
-            for c in self.__clients:
-                c.shutdown(socket.SHUT_RDWR)
-
-        self.__bind_socket.close()
+                self.__logger.exception(str(e))     
+           
+        binding_socket.close()
         self.__logger.info("Closed TCP socket")
 
     def __on_packet_received(self, client, packet):
 
+        assert isinstance(client, Client)
+        assert isinstance(packet, bytearray)
+
         # Make sure we should accept the packet
         if packetexcluder.should_accept(packet, self):
-            self.__bridge.tcp_packet_received(client, packet)
+            self.__bridge.tcp_packet_received(self, client, packet)
 
     def __on_client_close(self, client):
+
+        assert isinstance(client, Client)
 
         # Warning message
         if settings.settings["tcp"]["auth"] and not client.is_authenticated():
@@ -175,6 +191,11 @@ class Network():
 
             # Set running to false
             self.__running = False
+
+            # Stop every client listening
+            with self.__clients_lock:
+                for client in self.__clients:
+                    client.stop()
 
             # Connect to itself to stop the blocking accept
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
