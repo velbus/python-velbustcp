@@ -27,26 +27,22 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     def data_received(self, data):
         # pylint: disable-msg=E1101
         
-        d = bytearray(data)
-        self.__parser.feed(d)
+        if data:
+            self.__parser.feed(bytearray(data))
 
-        # Try to get a new packet in the parser
-        packet = self.__parser.next()
-        
-        while packet:
-            self.bridge.bus_packet_received(packet)   
+            # Try to get new packets in the parser
             packet = self.__parser.next()
+
+            while packet:
+                self.bridge.bus_packet_received(packet)   
+                packet = self.__parser.next()
 
     def connection_lost(self, exc):
         # pylint: disable-msg=E1101
 
-        print(exc)
-
-        if exc:
-            traceback.print_exc(exc)
-
         if exc is not None:
             print(exc)
+            traceback.print_exc(exc)
             self.on_error()
 
 class Bus():

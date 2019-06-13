@@ -20,6 +20,7 @@ class Client():
         self.__connection = connection
         self.__callback = callback
         self.__on_close = on_close
+        self.__address = connection.getpeername()
 
         # Authorization details
         self.__should_authorize = False
@@ -87,7 +88,7 @@ class Client():
         Address of the client.
         """
 
-        return self.__connection.getpeername()
+        return self.__address
 
     def __recv(self):
         """

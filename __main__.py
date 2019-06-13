@@ -25,9 +25,8 @@ class Main():
         self.__logger = logging.getLogger("VelbusTCP")
 
         # Bridge
-        self.__bridge = Bridge()    
-        self.__bridge.start()    
-   
+        self.__bridge = Bridge()
+        self.__bridge.start()
 
     def main_loop(self):
         """
@@ -74,11 +73,9 @@ def set_default_settings():
     default_conn["host"] = ""
     default_conn["port"] = 27015
     default_conn["relay"] = True
-    
     default_conn["ssl"] = False
     default_conn["pk"] = ""
-    default_conn["cert"] = ""
-    
+    default_conn["cert"] = ""  
     default_conn["auth"] = False
     default_conn["authkey"] = ""    
     lib.settings.settings["connections"].append(default_conn)
@@ -189,14 +186,14 @@ def validate_settings(settings):
 
         lib.settings.settings["logging"] = dict()
         
-        if ("type" in settings["logging"]):
+        if "type" in settings["logging"]:
             
             if (not settings["logging"]["type"] in ["debug", "info"]):
                 raise ValueError("Provided option logging.type incorrect, expected 'debug' or 'info', got '{0}'".format(settings["logging"]["type"]))
 
             lib.settings.settings["logging"]["type"] = settings["logging"]["type"]
 
-        if ("output" in settings["logging"]):
+        if "output" in settings["logging"]:
             
             if (not settings["logging"]["output"] in ["syslog", "stream"]):
                 raise ValueError("Provided option logging.output incorrect, expected 'syslog' or 'stream', got '{0}'".format(settings["logging"]["output"]))

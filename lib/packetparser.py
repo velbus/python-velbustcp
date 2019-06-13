@@ -7,9 +7,9 @@ from . import consts
 STX                 = 0x0F
 ETX                 = 0x04
 LENGTH_MASK         = 0x0F
-HEADER_LENGTH       = 3         # Header: [STX, priority, address, RTR+data length]
+HEADER_LENGTH       = 4         # Header: [STX, priority, address, RTR+data length]
 MAX_DATA_AMOUNT     = 8         # Maximum amount of data bytes in a packet
-MIN_PACKET_LENGTH   = 6         # Smallest possible packet: [STX, priority, address, RTR+data length, command, CRC, ETC]
+MIN_PACKET_LENGTH   = 6         # Smallest possible packet: [STX, priority, address, RTR+data length, CRC, ETC]
 
 class PacketParser:
     """
@@ -96,10 +96,10 @@ class PacketParser:
 
         # Shortcut if we don't have enough bytes in the buffer to have a valid packet
         if len(self.buffer) < MIN_PACKET_LENGTH:
-            return False        
-        
+            return False
+      
         # Shortcut if we don't have enough bytes to complete the packet length specified in body
-        if len(self.buffer) < self.__curr_packet_length():
+        if not self.__has_packet_length_waiting():
             return False
 
         bytes_to_check  = bytearray(itertools.islice(self.buffer, 0, 4 + self.__curr_packet_body_length()))
@@ -107,6 +107,14 @@ class PacketParser:
         end_valid       = self.buffer[self.__curr_packet_length() - 1] == ETX
 
         return checksum_valid and end_valid
+
+    def __has_packet_length_waiting(self):
+        """
+        Checks whether the current packet has the full length's worth of data waiting in the buffer.
+        This should only be called when __has_valid_header_waiting() returns True.
+        """
+
+        return len(self.buffer) >= self.__curr_packet_length()
 
     def __curr_packet_length(self):
         """
@@ -165,7 +173,7 @@ class PacketParser:
 
         # Check if we have a valid packet until we don't have anything left in buffer
         has_valid_packet = self.__has_valid_packet_waiting()
-        while (len(self.buffer) > HEADER_LENGTH) and not has_valid_packet:
+        while (not has_valid_packet) and (len(self.buffer) > HEADER_LENGTH) and self.__has_packet_length_waiting():
             self.__realign_buffer()
             has_valid_packet = self.__has_valid_packet_waiting()
 
