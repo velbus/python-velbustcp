@@ -4,7 +4,7 @@ import time
 from .bus import Bus
 from .network import Network
 from .client import Client
-from .. import settings
+from ..settings import settings_dict
 
 class Bridge():
     """
@@ -18,10 +18,10 @@ class Bridge():
         Initialises the Bridge class.
         """
 
+        self.__settings = settings_dict
+
         # Logger
         self.__logger = logging.getLogger("VelbusTCP")
-
-        self.__settings = settings.settings
 
         # Create bus
         self.__bus = Bus(options=self.__settings["serial"], bridge=self)

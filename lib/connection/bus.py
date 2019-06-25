@@ -23,7 +23,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     def __init__(self):
         self.__parser = packetparser.PacketParser()
 
-
     def data_received(self, data):
         # pylint: disable-msg=E1101
         

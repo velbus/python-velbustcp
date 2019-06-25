@@ -1,6 +1,6 @@
 {
 	"connections": 
-	{
+	[
 		{
 			"host": "",
 			"port": 27015,
@@ -10,8 +10,18 @@
 			"pk": "privkey.pem",
 			"auth": true,
 			"auth_key": "your_auth_key"
+		},
+		{
+			"host": "127.0.0.1",
+			"port": 27016,
+			"relay": true,
+			"ssl": false,
+			"cert": "",
+			"pk": "",
+			"auth": false,
+			"auth_key": ""
 		}
-	},
+	],
 	"serial": {
 		"autodiscover": true,
 		"port": "/dev/ttyACM0"

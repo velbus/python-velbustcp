@@ -27,11 +27,25 @@ class Network():
         self.__options = options
 
     def relay(self):
-        return self.__options["relay"]    
+        return self.__options["relay"]
 
+    def host(self):
+        return self.__options["host"]
+
+    def port(self):
+        return self.__options["port"]        
 
     def address(self):
         return (self.__options["host"], self.__options["port"])
+
+    def has_ssl(self):
+        return self.__options["ssl"] == True
+
+    def has_auth(self):
+        return self.__options["auth"] == True
+
+    def __auth_key(self):
+        return self.__options["auth_key"]
 
     def send(self, data, excluded_client=None):
         """
@@ -60,7 +74,7 @@ class Network():
                         except:
                             continue
 
-    def __accept_sockets(self, ssl=False, authorize=False, authorize_key=""):
+    def __accept_sockets(self):
         """
         Accepts clients from given socket, if the tcp server is closed it will also close socket
         """
@@ -72,11 +86,12 @@ class Network():
             try:
                 connection, address = self.__bind_socket.accept()
 
+                # Make sure that we're still active
                 if self.is_active():
 
-                    self.__logger.info("TCP connection from " + str(address))
+                    self.__logger.info("TCP connection from {0}".format(str(address)))
 
-                    if ssl:
+                    if self.has_ssl():
                         
                         try:
                             return self.__context.wrap_socket(connection, server_side=True)
@@ -87,8 +102,8 @@ class Network():
 
                     client = Client(connection, self.__on_packet_received, self.__on_client_close)
 
-                    if authorize:
-                        client.set_should_authorize(authorize_key)
+                    if self.has_auth():
+                        client.set_should_authorize(self.__auth_key())
 
                     client.start()
 
@@ -116,10 +131,10 @@ class Network():
         assert isinstance(client, Client)
 
         # Warning message
-        if self.__options["auth"] and not client.is_authenticated():
-            self.__logger.info("TCP connection closed " + str(client.address()) + " [auth failed]")
+        if self.__options["auth"] and not client.is_authorized():
+            self.__logger.info("TCP connection closed {0} [auth failed]".format(str(client.address())))
         else:
-            self.__logger.info("TCP connection closed " + str(client.address()))       
+            self.__logger.info("TCP connection closed {0}".format(str(client.address())))
 
     def is_active(self):
         """
@@ -140,14 +155,14 @@ class Network():
 
         self.__bind_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__bind_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)      
-        self.__bind_socket.bind((self.__options["host"], self.__options["port"]))
+        self.__bind_socket.bind(self.address())
         self.__bind_socket.listen(0)
 
-        if self.__options["ssl"]:
+        if self.has_ssl():
             self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)       
             self.__context.load_cert_chain(self.__options["cert"], keyfile=self.__options["pk"])
         
-        self.__logger.info("Listening to TCP connections on " + str(self.__options["port"]))
+        self.__logger.info("Listening to TCP connections on {0}:{1}".format(self.host(), self.port()))
 
         # Now that we reached here, set running
         self.__running = True
@@ -164,7 +179,7 @@ class Network():
     
         if self.is_active():
 
-            self.__logger.info("Stopping TCP connection")
+            self.__logger.info("Stopping TCP connection {0}:{1}".format(self.host(), self.port()))
 
             # Set running to false
             self.__running = False
@@ -176,7 +191,7 @@ class Network():
 
             # Connect to itself to stop the blocking accept
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", self.__options["port"]))
+            s.connect(("127.0.0.1", self.port()))
                 
             # Wait till the server thread is closed
             self.__server_thread.join()
