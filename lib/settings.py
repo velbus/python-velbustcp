@@ -4,6 +4,9 @@ import os
 settings_dict = dict()
 
 def set_default_settings():
+
+    settings_dict["velbus"] = dict()
+    settings_dict["velbus"]["ntp"] = False
   
     settings_dict["connections"] = []
     default_conn = {}
@@ -26,6 +29,14 @@ def set_default_settings():
     settings_dict["logging"]["output"] = "stream"
 
 def validate_and_set_settings(settings):
+
+    # Velbus configuration
+    if "velbus" in settings:
+
+        settings_dict["velbus"] = {}
+
+        if "ntp" in settings["velbus"]:
+            settings_dict["velbus"]["ntp"] = settings["velbus"]["ntp"]
 
     # Has connection(s)
     if "connections" in settings:

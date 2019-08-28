@@ -1,4 +1,8 @@
 {
+	"velbus":
+	{
+		"ntp": "false"
+	},
 	"connections": 
 	[
 		{

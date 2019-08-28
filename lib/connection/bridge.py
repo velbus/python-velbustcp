@@ -1,10 +1,12 @@
 import logging
 import time
+import datetime
 
 from .bus import Bus
 from .network import Network
 from .client import Client
 from ..settings import settings_dict
+from ..ntp import Ntp
 
 class Bridge():
     """
@@ -30,6 +32,9 @@ class Bridge():
         self.__networks = []
         for connection in self.__settings["connections"]:
             self.__networks.append(Network(options=connection, bridge=self))
+
+        # Create NTP
+        self.__ntp = Ntp(self.send_bus)
         
     def start(self):
         """
@@ -46,6 +51,12 @@ class Bridge():
 
         for network in self.__networks:
             network.start()
+
+        if self.__settings["velbus"]["ntp"]:
+            self.__ntp.start()     
+
+    def send_bus(self, packet):
+        self.__bus.send(packet)
 
     def bus_error(self):
         """
@@ -104,10 +115,11 @@ class Bridge():
 
     def stop(self):
         """
-        Stops bus and network.
+        Stops NTP, bus and network.
         """
 
+        self.__ntp.stop()
         self.__bus.stop()
 
         for network in self.__networks:
-            network.stop()
+            network.stop()        

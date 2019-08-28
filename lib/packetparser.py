@@ -65,7 +65,8 @@ class PacketParser:
 
         return start_valid and bodysize_valid and priority_valid
 
-    def __checksum(self, arr):
+    @staticmethod
+    def checksum(arr):
         """
         Calculate checksum of the given array.
 		The checksum is calculated by summing all values in an array, then performing the two's complement.
@@ -103,7 +104,7 @@ class PacketParser:
             return False
 
         bytes_to_check  = bytearray(itertools.islice(self.buffer, 0, 4 + self.__curr_packet_body_length()))
-        checksum_valid  = self.buffer[self.__curr_packet_length() - 2] == self.__checksum(bytes_to_check)
+        checksum_valid  = self.buffer[self.__curr_packet_length() - 2] == self.checksum(bytes_to_check)
         end_valid       = self.buffer[self.__curr_packet_length() - 1] == ETX
 
         return checksum_valid and end_valid
