@@ -15,9 +15,9 @@ def set_default_settings():
     default_conn["relay"] = True
     default_conn["ssl"] = False
     default_conn["pk"] = ""
-    default_conn["cert"] = ""  
+    default_conn["cert"] = ""
     default_conn["auth"] = False
-    default_conn["authkey"] = ""    
+    default_conn["authkey"] = ""
     settings_dict["connections"].append(default_conn)
 
     settings_dict["serial"] = dict()
