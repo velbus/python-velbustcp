@@ -45,7 +45,7 @@ class Network():
         return self.__options["auth"] == True
 
     def __auth_key(self):
-        return self.__options["auth_key"]
+        return self.__options["authkey"]
 
     def send(self, data, excluded_client=None):
         """
@@ -94,7 +94,7 @@ class Network():
                     if self.has_ssl():
                         
                         try:
-                            return self.__context.wrap_socket(connection, server_side=True)
+                            connection = self.__context.wrap_socket(connection, server_side=True)
 
                         except ssl.SSLError as e:
                             self.__logger.error("Couldn't wrap socket")
@@ -162,7 +162,7 @@ class Network():
             self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)       
             self.__context.load_cert_chain(self.__options["cert"], keyfile=self.__options["pk"])
         
-        self.__logger.info("Listening to TCP connections on {0}:{1}".format(self.host(), self.port()))
+        self.__logger.info("Listening to TCP connections on {0}:{1} [SSL:{2}]".format(self.host(), self.port(), self.has_ssl()))
 
         # Now that we reached here, set running
         self.__running = True
