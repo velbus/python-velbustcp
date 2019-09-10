@@ -100,6 +100,8 @@ class Ntp():
 
         assert isinstance(time, datetime)
 
+        year_bytes = time.year.to_bytes(2, "big")
+
         packet = bytearray()
         packet.append(0x0F)
         packet.append(0xFB)
@@ -108,8 +110,8 @@ class Ntp():
         packet.append(0xB7)
         packet.append(time.day)
         packet.append(time.month)
-        packet.append((time.year and 0xFF00) >> 8) 
-        packet.append(time.year and 0xFF)
+        packet.append(year_bytes[0])
+        packet.append(year_bytes[1])
         packet.append(PacketParser.checksum(packet))
         packet.append(0x04)
 
