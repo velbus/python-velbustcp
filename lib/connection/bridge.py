@@ -34,7 +34,7 @@ class Bridge():
             self.__networks.append(Network(options=connection, bridge=self))
 
         # Create NTP
-        self.__ntp = Ntp(self.send_bus)
+        self.__ntp = Ntp(self.send)
         
     def start(self):
         """
@@ -55,8 +55,16 @@ class Bridge():
         if self.__settings["velbus"]["ntp"]:
             self.__ntp.start()     
 
-    def send_bus(self, packet):
+    def send(self, packet):
+        """
+        Sends the packet to both bus and network.
+        """
+
         self.__bus.send(packet)
+
+        # Relay to connected network clients
+        for network in self.__networks:
+            network.send(packet)        
 
     def bus_error(self):
         """
