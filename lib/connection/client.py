@@ -95,7 +95,7 @@ class Client():
         Handles client communication.
         """
 
-        parser = packetparser.PacketParser()
+        self.__is_active = True
 
         # Handle authorization
         if self.__should_authorize:
@@ -103,10 +103,11 @@ class Client():
 
             if self.__authorize_key == auth_key:
                 self.__authorized = True
-                self.__is_active = True
+                
+            else:
+                self.stop()
 
-        else:
-            self.__is_active = True      
+        parser = packetparser.PacketParser()                
 
         # Receive data
         while self.is_active():
