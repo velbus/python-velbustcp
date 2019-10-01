@@ -99,18 +99,19 @@ class Client():
 
         # Handle authorization
         if self.__should_authorize:
-            auth_key = self.__connection.recv(1024).decode("utf-8").strip()
+
+            try:
+                auth_key = self.__connection.recv(1024).decode("utf-8").strip()
+            except:
+                self.stop()
 
             if self.__authorize_key == auth_key:
                 self.__authorized = True
-                
-            else:
-                self.stop()
-
+               
         parser = packetparser.PacketParser()                
 
         # Receive data
-        while self.is_active():
+        while self.is_active() and self.is_authorized():
 
             try:
                 data = self.__connection.recv(1024)
