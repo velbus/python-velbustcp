@@ -34,7 +34,7 @@ class Bridge():
             self.__networks.append(Network(options=connection, bridge=self))
 
         # Create NTP
-        self.__ntp = Ntp(self.send)
+        self.__ntp = Ntp(self.__settings["ntp"], self.send)
         
     def start(self):
         """
@@ -52,7 +52,7 @@ class Bridge():
         for network in self.__networks:
             network.start()
 
-        if self.__settings["velbus"]["ntp"]:
+        if self.__settings["ntp"]["enabled"]:
             self.__ntp.start()     
 
     def send(self, packet):

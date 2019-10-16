@@ -5,8 +5,9 @@ settings_dict = dict()
 
 def set_default_settings():
 
-    settings_dict["velbus"] = dict()
-    settings_dict["velbus"]["ntp"] = False
+    settings_dict["ntp"] = dict()
+    settings_dict["ntp"]["enabled"] = False
+    settings_dict["ntp"]["synctime"] = ""
   
     settings_dict["connections"] = []
     default_conn = {}
@@ -30,13 +31,35 @@ def set_default_settings():
 
 def validate_and_set_settings(settings):
 
-    # Velbus configuration
-    if "velbus" in settings:
+    # NTP configuration
+    if "ntp" in settings:
 
-        settings_dict["velbus"] = {}
+        settings_dict["ntp"] = {}
 
-        if "ntp" in settings["velbus"]:
-            settings_dict["velbus"]["ntp"] = settings["velbus"]["ntp"]
+        if "enabled" in settings["ntp"]:
+            
+            if (settings["ntp"]["enabled"] != True) and (settings["ntp"]["enabled"] != False):
+                raise ValueError("Provided option '{0}' is invalid for ntp.enabled".format(settings["ntp"]["enabled"]))
+            
+            settings_dict["ntp"]["enabled"] = settings["ntp"]["enabled"]            
+
+        if "synctime" in settings["ntp"] and settings["ntp"]["synctime"] != "":
+
+            # Validate sync time 
+            splitted = settings["ntp"]["synctime"].split(":")
+
+            if len(splitted) != 2:
+                raise ValueError("The provided sync time has an invalid format '{0}', should be 'hh:mm' or empty".format(settings["ntp"]["synctime"]))
+
+            hh = int(splitted[0])
+            if (hh < 0) or (hh > 23):
+                raise ValueError("The provided sync time hour is invalid '{0}'".format(hh))
+
+            mm = int(splitted[1])
+            if (mm < 0) or (mm > 59):
+                raise ValueError("The provided sync time minute is invalid '{0}'".format(mm))
+
+            settings_dict["ntp"]["synctime"] = settings["ntp"]["synctime"]            
 
     # Has connection(s)
     if "connections" in settings:

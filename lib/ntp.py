@@ -1,16 +1,22 @@
+from pytz import timezone, utc
+from tzlocal import get_localzone
 from datetime import datetime, timedelta
 from .packetparser import PacketParser
 import threading
 import time
 import logging
 
+
 class Ntp():
 
-    def __init__(self, sendcb):
+    def __init__(self, settings, sendcb):
         self.__is_active = False
         self.__sleep_event = threading.Event()
-        self.__sendcb = sendcb
+        self.__settings = settings
+        self.__sendcb = sendcb        
         self.__logger = logging.getLogger("VelbusTCP")
+
+        self.__timezone = get_localzone()
 
     def start(self):
         """
@@ -41,10 +47,52 @@ class Ntp():
             # Send the NTP packets on next minute transition
             self.__send_next_transition()
 
-            # Sleep until a minute before next hour passing
-            now = datetime.now()
-            until = now + timedelta(hours=1) - timedelta(minutes=now.minute + 1, seconds=now.second, microseconds=now.microsecond)
+            if not self.is_active():
+                break
 
+            # Figure out how long to sleep:
+            # Till next hour transition (if no synctime specified)
+            # Till synctime
+            # Till next DST transition
+
+            now = utc.localize(datetime.utcnow()).astimezone(self.__timezone)
+
+            # DST
+            until_dst = next(time for time in self.__timezone._utc_transition_times if time > datetime.utcnow())
+            until_dst = until_dst.astimezone(self.__timezone)            
+            
+            # No synctime: one hour
+            if (not "synctime" in self.__settings) or ("synctime" in self.__settings and self.__settings["synctime"] == ""):
+                until_synctime = now + timedelta(hours=1) - timedelta(minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+
+                if until_synctime < until_dst:
+                    until = until_synctime
+                else:
+                    until = until_dst                    
+
+            # Synctime set, check between timesync and DST which is closest
+            else:
+
+                # Timesync
+                splitted = self.__settings["synctime"].split(":")
+                hh = int(splitted[0])
+                mm = int(splitted[1])
+
+                until_timesync = utc.localize(datetime.utcnow()).astimezone(self.__timezone).replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+                # Add one day if it has already passed
+                if until_timesync < now:
+                    until_timesync = until_timesync + timedelta(days=1)
+
+                if until_timesync < until_dst:
+                    until = until_timesync
+                else:
+                    until = until_dst    
+
+            self.__logger.info("Waiting for next NTP broadcast at {0}".format(until))
+            
+            # Sleep until a minute before 
+            until = until - timedelta(minutes=1)
             dt = until-now
             self.__sleep_event.wait(dt.total_seconds())
 
@@ -54,20 +102,21 @@ class Ntp():
         """
 
         # Go to the next minute
-        now = datetime.now()
+        now = datetime.utcnow()
         until = now + timedelta(minutes=1) - timedelta(seconds=now.second, microseconds=now.microsecond)
+        timezoned = utc.localize(until).astimezone(self.__timezone)
 
         # Create the packets to send, based on the until time
-        time_packet = self.get_time_packet(until)
-        date_packet = self.get_date_packet(until)
+        time_packet = self.get_time_packet(timezoned)
+        date_packet = self.get_date_packet(timezoned)
         dst_packet = self.get_dst_packet()
 
         # Wait until we passed the 'until' time
-        while (datetime.now() < until) and self.is_active():
+        while (datetime.utcnow() < until) and self.is_active():
             time.sleep(0.1)
         
         if self.is_active():
-            self.__logger.info("Broadcasting NTP {0}".format(until))
+            self.__logger.info("Broadcasting NTP {0}".format(timezoned))
             self.__sendcb(time_packet)
             self.__sendcb(date_packet)
             self.__sendcb(dst_packet)

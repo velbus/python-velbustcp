@@ -1,8 +1,9 @@
 {
-	"velbus":
+	"ntp":
 	{
-		"ntp": "false"
-	},
+		"enabled": false,
+		"synctime": "03:00"
+	}
 	"connections": 
 	[
 		{
