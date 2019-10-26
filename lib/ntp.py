@@ -59,7 +59,7 @@ class Ntp():
 
             # DST
             until_dst = next(time for time in self.__timezone._utc_transition_times if time > datetime.utcnow())
-            until_dst = until_dst.astimezone(self.__timezone)            
+            until_dst = utc.localize(until_dst).astimezone(self.__timezone)            
             
             # No synctime: one hour
             if (not "synctime" in self.__settings) or ("synctime" in self.__settings and self.__settings["synctime"] == ""):
@@ -68,7 +68,7 @@ class Ntp():
                 if until_synctime < until_dst:
                     until = until_synctime
                 else:
-                    until = until_dst                    
+                    until = until_dst
 
             # Synctime set, check between timesync and DST which is closest
             else:
@@ -104,18 +104,23 @@ class Ntp():
         # Go to the next minute
         now = datetime.utcnow()
         until = now + timedelta(minutes=1) - timedelta(seconds=now.second, microseconds=now.microsecond)
-        timezoned = utc.localize(until).astimezone(self.__timezone)
-
-        # Create the packets to send, based on the until time
-        time_packet = self.get_time_packet(timezoned)
-        date_packet = self.get_date_packet(timezoned)
-        dst_packet = self.get_dst_packet()
-
+        
         # Wait until we passed the 'until' time
         while (datetime.utcnow() < until) and self.is_active():
             time.sleep(0.1)
         
+        # Now that we're at the minute transition, send the packet
         if self.is_active():
+
+            # Get current time
+            # Don't use the until var, as this will not have the DST calculated in on DST transition.
+            timezoned = utc.localize(datetime.utcnow()).astimezone(self.__timezone)
+
+            # Create the packets to send, based on the until time
+            time_packet = self.get_time_packet(timezoned)
+            date_packet = self.get_date_packet(timezoned)
+            dst_packet = self.get_dst_packet()
+
             self.__logger.info("Broadcasting NTP {0}".format(timezoned))
             self.__sendcb(time_packet)
             self.__sendcb(date_packet)
