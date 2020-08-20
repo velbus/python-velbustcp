@@ -82,7 +82,7 @@ class Bus():
                 if not self.is_active():
                     break
 
-                packet = self.__send_buffer.popleft()
+                packet_id, packet = self.__send_buffer.popleft()
 
                 # Ensure that we sleep SEND_DELAY
                 t = datetime.now() - last_send_time
@@ -93,6 +93,7 @@ class Bus():
                 # Write packet and set new last send time
                 try:
                     self.__serial_port.write(packet)
+                    self.__bridge.bus_packet_sent(packet_id)
                     self.__logger.debug("[BUS OUT] " + " ".join(hex(x) for x in packet))
                 except Exception as e:
                     self.__logger.exception(e)
@@ -226,12 +227,17 @@ class Bus():
             self.__send_event.set()
             self.__send_thread.join()
 
-    def send(self, packet):
+    def send(self, id_packet_tuple):
         """
         Queues a packet to be sent on the serial connection.
 
         :param packet: The packet that should be sent on the serial connection.
         """
 
-        self.__send_buffer.append(packet)
+        assert isinstance(id_packet_tuple, tuple)
+        packet_id, packet = id_packet_tuple
+        assert isinstance(packet_id, str)
+        assert isinstance(packet, bytearray)
+
+        self.__send_buffer.append(id_packet_tuple)
         self.__send_event.set()
