@@ -3,6 +3,7 @@ import time
 import datetime
 import uuid
 
+from .. import consts
 from .bus import Bus
 from .network import Network
 from .client import Client
@@ -36,9 +37,6 @@ class Bridge():
         for connection in self.__settings["connections"]:
             self.__networks.append(Network(options=connection, bridge=self))
 
-        # Packet buffer
-        self.__buffer = []
-
         # Sent packets dict
         # [packet_id] = (client, packet)
         self.__received_packets = {}
@@ -65,6 +63,13 @@ class Bridge():
         if self.__settings["ntp"]["enabled"]:
             self.__ntp.start()  
 
+    def send(self, packet):
+        """
+        Sends a packet, received internally (ntp).
+        """
+
+        self.__bus.send(packet)
+
     def bus_error(self):
         """
         Called when bus goes into error.
@@ -84,17 +89,18 @@ class Bridge():
 
         assert isinstance(packet, bytearray)
 
-        self.__logger.debug("[BUS IN] " + " ".join(hex(x) for x in packet))
+        self.__logger.info("[BUS IN] " + " ".join(hex(x) for x in packet))
 
         # Buffer full/off?
         has_command = (packet[3] and 0x0F) != 0
-
+        
         if packet[1] == consts.PRIORITY_HIGH:
+
             if has_command:
-
                 command = packet[4]
-                if command in [consts.COMMAND_BUS_ACTIVE, consts.COMMAND_BUS_OFF, consts.COMMAND_BUS_BUFFERREADY, consts.COMMAND_BUS_BUFFERFULL]:
 
+                if command in [consts.COMMAND_BUS_ACTIVE, consts.COMMAND_BUS_OFF, consts.COMMAND_BUS_BUFFERREADY, consts.COMMAND_BUS_BUFFERFULL]:
+                    
                     if command == consts.COMMAND_BUS_ACTIVE:
                         self.__logger.info("Received bus active")
                         self.__bus_active = True
@@ -110,6 +116,14 @@ class Bridge():
                     elif command == consts.COMMAND_BUS_BUFFERFULL:
                         self.__logger.info("Received bus buffer full")
                         self.__bus_buffer_ready = False
+
+                    # Lock/unlock bus
+                    if not self.__bus_active or not self.__bus_buffer_ready:
+                        self.__logger.warn("Locking the bus!")
+                        self.__bus.lock()                    
+                    elif self.__bus_active and self.__bus_buffer_ready:
+                        self.__logger.warn("Unlocking the bus!")
+                        self.__bus.unlock()
 
         for network in self.__networks:
             if network.is_active():
@@ -128,12 +142,15 @@ class Bridge():
         assert isinstance(client, Client)
         assert isinstance(packet, bytearray)
 
-        #TODO: Only send to network if bus is active?
-
         self.__logger.debug("[TCP IN] " + " ".join(hex(x) for x in packet))
 
+        # Do we not yet have exceeded the max buffer length?
+        if len(self.__received_packets) == consts.MAX_BUFFER_LENGTH:
+            self.__logger.error("Buffer full on TCP receive.")
+            return
+
         # Generate unique ID for this packet
-        packet_id = uuid.uuid4()
+        packet_id = str(uuid.uuid4())
         
         # Add to dict
         self.__received_packets[packet_id] = (client, packet)
@@ -142,7 +159,7 @@ class Bridge():
         if self.__bus.is_active():
             self.__bus.send((packet_id, packet))
 
-    def bus_packet_sent(id) -> None:
+    def bus_packet_sent(self, id) -> None:
         """
         Called when the bus sent a packet on the serial port.
         
@@ -157,10 +174,11 @@ class Bridge():
         for network in self.__networks:
 
             # Send to everyone except the one we received it from
-            if network != client and network.is_active() and network.relay():
-                network.send(packet)
+            if network.is_active() and network.relay():
+                network.send(packet, client)
 
         del self.__received_packets[id]
+        self.__logger.info(f"Len: {len(self.__received_packets)}")
 
     def stop(self):
         """

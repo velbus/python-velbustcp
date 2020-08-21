@@ -9,6 +9,7 @@ import logging
 import traceback
 
 from .. import packetparser
+from .. import consts
 
 SEND_DELAY  = 0.05
 READ_DELAY  = 0.01
@@ -59,7 +60,11 @@ class Bus():
         self.__connected = False
         self.__in_error = False
         self.__send_event = threading.Event()
-        self.__send_buffer = collections.deque(maxlen=10000)
+        self.__send_buffer = collections.deque(maxlen=consts.MAX_BUFFER_LENGTH)
+
+        # Serial lock event
+        self.__serial_lock = threading.Event()
+        self.unlock()      
                
         self.__options = options
         self.__bridge = bridge
@@ -89,6 +94,9 @@ class Bus():
                 if t.total_seconds() < SEND_DELAY:
                     q = SEND_DELAY - t.total_seconds()
                     time.sleep(q)
+
+                # Wait for serial lock to be not set
+                self.__serial_lock.wait()
 
                 # Write packet and set new last send time
                 try:
@@ -241,3 +249,17 @@ class Bus():
 
         self.__send_buffer.append(id_packet_tuple)
         self.__send_event.set()
+
+    def lock(self) -> None:
+        """
+        Locks the bus, disabling writes to the bus.
+        """
+        
+        self.__serial_lock.clear()
+
+    def unlock(self) -> None:
+        """
+        Unlocks the bus, allowing writes to the bus.
+        """
+
+        self.__serial_lock.set()
