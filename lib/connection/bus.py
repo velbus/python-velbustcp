@@ -239,7 +239,7 @@ class Bus():
         """
         Queues a packet to be sent on the serial connection.
 
-        :param packet: The packet that should be sent on the serial connection.
+        :param id_packet_tuple: Tuple of a requestID and packet.
         """
 
         assert isinstance(id_packet_tuple, tuple)

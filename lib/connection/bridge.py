@@ -37,9 +37,9 @@ class Bridge():
         for connection in self.__settings["connections"]:
             self.__networks.append(Network(options=connection, bridge=self))
 
-        # Sent packets dict
+        # Buffer to track received TCP packets
         # [packet_id] = (client, packet)
-        self.__received_packets = {}
+        self.__tcp_buffer = {}
 
         # Create NTP
         self.__ntp = Ntp(self.__settings["ntp"], self.send)
@@ -68,7 +68,7 @@ class Bridge():
         Sends a packet, received internally (ntp).
         """
 
-        self.__bus.send(packet)
+        self.queue_packet(None, packet)
 
     def bus_error(self):
         """
@@ -89,7 +89,7 @@ class Bridge():
 
         assert isinstance(packet, bytearray)
 
-        self.__logger.info("[BUS IN] " + " ".join(hex(x) for x in packet))
+        self.__logger.debug("[BUS IN] " + " ".join(hex(x) for x in packet))
 
         # Buffer full/off?
         has_command = (packet[3] and 0x0F) != 0
@@ -143,18 +143,32 @@ class Bridge():
         assert isinstance(packet, bytearray)
 
         self.__logger.debug("[TCP IN] " + " ".join(hex(x) for x in packet))
+        self.queue_packet(client, packet)
+
+    def queue_packet(self, client, packet) -> None:
+        """
+        Queues a packet to be sent on the bus.
+
+        :param client: Client which sent the packet, None if internal
+        :param packet: Packet received from the client
+        """
+
+        if client:
+            assert isinstance(client, Client)
+
+        assert isinstance(packet, bytearray)
 
         # Do we not yet have exceeded the max buffer length?
-        if len(self.__received_packets) == consts.MAX_BUFFER_LENGTH:
-            self.__logger.error("Buffer full on TCP receive.")
+        if len(self.__tcp_buffer) == consts.MAX_BUFFER_LENGTH:
+            self.__logger.warn("Buffer full on TCP receive.")
             return
 
         # Generate unique ID for this packet
         packet_id = str(uuid.uuid4())
         
         # Add to dict
-        self.__received_packets[packet_id] = (client, packet)
-        self.__logger.debug(f"Added {packet_id} to dict.")
+        self.__tcp_buffer[packet_id] = (client, packet)
+        self.__logger.debug(f"Added request {packet_id} to buffer.")
 
         if self.__bus.is_active():
             self.__bus.send((packet_id, packet))
@@ -163,12 +177,12 @@ class Bridge():
         """
         Called when the bus sent a packet on the serial port.
         
-        @id: The id of the packet sent.
+        :param id: The id of the packet sent.
         """
 
         assert isinstance(id, str)
 
-        client, packet = self.__received_packets[id]
+        client, packet = self.__tcp_buffer[id]
 
         # Relay to connected network clients
         for network in self.__networks:
@@ -177,8 +191,7 @@ class Bridge():
             if network.is_active() and network.relay():
                 network.send(packet, client)
 
-        del self.__received_packets[id]
-        self.__logger.info(f"Len: {len(self.__received_packets)}")
+        del self.__tcp_buffer[id]
 
     def stop(self):
         """
