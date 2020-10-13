@@ -23,11 +23,18 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
     def __init__(self):
         self.__parser = packetparser.PacketParser()
+        self.__logger = logging.getLogger("VelbusTCP")
+
+        self.__handle = open("/tmp/data.log", "w")
 
     def data_received(self, data):
         # pylint: disable-msg=E1101
         
         if data:
+            hex_str = " ".join("{:02x}".format(for c in bytearray(data)))
+            self.__handle.write(hex_str)
+            self.__handle.flush()
+            self.__logger.info(bytearray(data))
             self.__parser.feed(bytearray(data))
 
             # Try to get new packets in the parser
