@@ -31,7 +31,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         # pylint: disable-msg=E1101
         
         if data:
-            hex_str = " ".join("{:02x}".format(for c in bytearray(data)))
+            hex_str = " ".join("{:02x}".format(c) for c in bytearray(data))
             self.__handle.write(hex_str)
             self.__handle.flush()
             self.__logger.info(bytearray(data))
