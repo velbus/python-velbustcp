@@ -31,9 +31,9 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         
         if data:
             hex_str = " ".join("{:02x}".format(c) for c in bytearray(data))
-            self.__handle.write(hex_str)
+            self.__handle.writelines(hex_str)
             self.__handle.flush()
-            self.__logger.info(bytearray(data))
+            self.__logger.debug(bytearray(data))
             self.__parser.feed(bytearray(data))
 
             # Try to get new packets in the parser
@@ -48,6 +48,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
         if exc is not None:
             print(exc)
+            print(self)
             self.on_error()
 
 class Bus():
@@ -212,7 +213,7 @@ class Bus():
         self._reader = serial.threaded.ReaderThread(self.__serial_port, VelbusSerialProtocol)
         self._reader.start()
         self._reader.protocol.bridge = self.__bridge
-        self._reader.protocol.on_error = self.__on_error
+        self._reader.on_error = self.__on_error
         self._reader.connect()
 
         # Create write thread
