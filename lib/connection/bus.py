@@ -21,10 +21,16 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     """
 
     def __init__(self):
+
+        self.bridge = None
+        self.on_error = None
+
         self.__parser = packetparser.PacketParser()
         self.__logger = logging.getLogger("VelbusTCP")
-
         self.__handle = open("/tmp/data.log", "w")
+
+    def __call__(self):
+        return self
 
     def data_received(self, data):
         # pylint: disable-msg=E1101
@@ -40,14 +46,20 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
             packet = self.__parser.next()
 
             while packet:
-                self.bridge.bus_packet_received(packet)   
+                if self.bridge is not None:
+                    self.bridge.bus_packet_received(packet)
                 packet = self.__parser.next()
 
     def connection_lost(self, exc):
         # pylint: disable-msg=E1101
+        
+        self.__logger.error("Connection lost")
 
         if exc is not None:
-            print(exc)
+            self.__logger.exception(exc)
+
+        if self.on_error is not None:
+            self.on_error()
 
 class Bus():
 
@@ -80,7 +92,7 @@ class Bus():
 
         last_send_time = datetime.now()
 
-        while self.is_active() and not self.in_errror():
+        while self.is_active() and not self.in_error():
             self.__send_event.wait()
             self.__send_event.clear()
 
@@ -119,6 +131,24 @@ class Bus():
         """
 
         self.__in_error = True
+        self.stop()
+
+        # Reconnect thread
+        _ = threading.Thread(target=self.__reconnect)
+        _.start()
+
+    def __reconnect(self):
+        """
+        Reconnects until active.
+        """
+        self.__logger.info("Attempting to reconnect")
+
+        while not self.is_active():
+            try:
+                self.start()
+            except:
+                self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
+                time.sleep(5)
 
     def __search_for_serial(self):
         """
@@ -151,7 +181,7 @@ class Bus():
 
         return self.__connected
 
-    def in_errror(self):
+    def in_error(self):
         """
         Returns whether or not the serial connection is in error.
 
@@ -167,6 +197,8 @@ class Bus():
 
         if self.is_active():
             return
+
+        self.__port = None
 
         # If we need to autodiscover port
         if self.__options["autodiscover"]:
@@ -185,7 +217,7 @@ class Bus():
         else:
             self.__port = self.__options["port"]
 
-        if self.__port is None:
+        if self.__port is None or self.__port == '':
             raise ValueError("Couldn't find a port to open communication on")
 
         self.__serial_port = serial.Serial(
@@ -208,10 +240,11 @@ class Bus():
         self.__in_error = False
        
         # Create reader thread
-        self._reader = serial.threaded.ReaderThread(self.__serial_port, VelbusSerialProtocol)
+        protocol = VelbusSerialProtocol()
+        protocol.bridge = self.__bridge
+        protocol.on_error = self.__on_error
+        self._reader = serial.threaded.ReaderThread(self.__serial_port, protocol)
         self._reader.start()
-        self._reader.protocol.bridge = self.__bridge
-        self._reader.connect()
 
         # Create write thread
         self.__send_thread         = threading.Thread(target=self.__write_thread)
@@ -232,7 +265,7 @@ class Bus():
 
             self.__connected = False
 
-            if not self.in_errror():
+            if not self.in_error():
                 self._reader.close()
 
             self.__send_event.set()
