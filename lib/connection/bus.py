@@ -48,7 +48,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
         if exc is not None:
             print(exc)
-            self.errored()
 
 class Bus():
 
@@ -212,7 +211,6 @@ class Bus():
         self._reader = serial.threaded.ReaderThread(self.__serial_port, VelbusSerialProtocol)
         self._reader.start()
         self._reader.protocol.bridge = self.__bridge
-        self._reader.protocol.errored = self.__on_error
         self._reader.connect()
 
         # Create write thread
