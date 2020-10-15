@@ -6,7 +6,6 @@ import collections
 import time
 from datetime import datetime
 import logging
-import traceback
 
 from .. import packetparser
 from .. import consts
@@ -49,7 +48,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
         if exc is not None:
             print(exc)
-            traceback.print_exc(exc)
             self.on_error()
 
 class Bus():
