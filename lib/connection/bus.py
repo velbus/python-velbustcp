@@ -27,7 +27,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
         self.__parser = packetparser.PacketParser()
         self.__logger = logging.getLogger("VelbusTCP")
-        self.__handle = open("/tmp/data.log", "w")
 
     def __call__(self):
         return self
@@ -36,9 +35,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         # pylint: disable-msg=E1101
         
         if data:
-            hex_str = " ".join("{:02x}".format(c) for c in bytearray(data))
-            self.__handle.writelines(hex_str)
-            self.__handle.flush()
             self.__logger.debug(bytearray(data))
             self.__parser.feed(bytearray(data))
 
@@ -48,6 +44,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
             while packet:
                 if self.bridge is not None:
                     self.bridge.bus_packet_received(packet)
+
                 packet = self.__parser.next()
 
     def connection_lost(self, exc):
@@ -73,8 +70,10 @@ class Bus():
 
         self.__logger = logging.getLogger("VelbusTCP")
 
+        self.__do_reconnect = False
         self.__connected = False
         self.__in_error = False
+        self.__reconnect_event = threading.Event()
         self.__send_event = threading.Event()
         self.__send_buffer = collections.deque(maxlen=consts.MAX_BUFFER_LENGTH)
 
@@ -129,26 +128,26 @@ class Bus():
         """
         Called when an error occurred.
         """
-
+    
         self.__in_error = True
-        self.stop()
-
-        # Reconnect thread
-        _ = threading.Thread(target=self.__reconnect)
-        _.start()
+        self.stop() 
+        self.ensure()
 
     def __reconnect(self):
         """
         Reconnects until active.
         """
-        self.__logger.info("Attempting to reconnect")
+        self.__logger.info("Attempting to connect")
 
-        while not self.is_active():
+        while self.__do_reconnect and not self.is_active():
             try:
                 self.start()
             except:
                 self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
-                time.sleep(5)
+                self.__reconnect_event.clear()
+                self.__reconnect_event.wait(5)                
+
+        self.__logger.info("Leaving")
 
     def __search_for_serial(self):
         """
@@ -189,6 +188,17 @@ class Bus():
         """
 
         return self.__in_error
+
+    def ensure(self):
+        """
+        """
+
+        if not self.is_active():
+            self.__do_reconnect = True
+
+            # Start reconnecting thread
+            _ = threading.Thread(target=self.__reconnect)
+            _.start()
 
     def start(self):
         """
@@ -259,10 +269,13 @@ class Bus():
         Stops the serial communication if the serial connection is active.
         """
 
+        self.__logger.info("Stopping serial connection")
+
+        self.__do_reconnect = False
+        self.__reconnect_event.set()
+
+        # Stop serial connection if active
         if self.is_active():
-
-            self.__logger.info("Stopping serial connection")
-
             self.__connected = False
 
             if not self.in_error():

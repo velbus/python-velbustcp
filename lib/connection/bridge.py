@@ -46,16 +46,10 @@ class Bridge():
         
     def start(self):
         """
-        Starts bus and when succesful, starts TCP network(s).
+        Starts bus and TCP network(s).
         """
 
-        while not self.__bus.is_active():
-
-            try:
-                self.__bus.start()
-            except:
-                self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
-                time.sleep(5)
+        self.__bus.ensure()
 
         for network in self.__networks:
             network.start()
