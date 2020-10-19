@@ -145,9 +145,7 @@ class Bus():
             except:
                 self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
                 self.__reconnect_event.clear()
-                self.__reconnect_event.wait(5)                
-
-        self.__logger.info("Leaving")
+                self.__reconnect_event.wait(5)
 
     def __search_for_serial(self):
         """
