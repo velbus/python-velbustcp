@@ -6,9 +6,9 @@ import collections
 import time
 from datetime import datetime
 import logging
-import traceback
 
 from .. import packetparser
+from .. import consts
 
 SEND_DELAY  = 0.05
 READ_DELAY  = 0.01
@@ -21,27 +21,41 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     """
 
     def __init__(self):
+
+        self.bridge = None
+        self.on_error = None
+
         self.__parser = packetparser.PacketParser()
+        self.__logger = logging.getLogger("VelbusTCP")
+
+    def __call__(self):
+        return self
 
     def data_received(self, data):
         # pylint: disable-msg=E1101
         
         if data:
+            self.__logger.debug(bytearray(data))
             self.__parser.feed(bytearray(data))
 
             # Try to get new packets in the parser
             packet = self.__parser.next()
 
             while packet:
-                self.bridge.bus_packet_received(packet)   
+                if self.bridge is not None:
+                    self.bridge.bus_packet_received(packet)
+
                 packet = self.__parser.next()
 
     def connection_lost(self, exc):
         # pylint: disable-msg=E1101
+        
+        self.__logger.error("Connection lost")
 
         if exc is not None:
-            print(exc)
-            traceback.print_exc(exc)
+            self.__logger.exception(exc)
+
+        if self.on_error is not None:
             self.on_error()
 
 class Bus():
@@ -56,10 +70,16 @@ class Bus():
 
         self.__logger = logging.getLogger("VelbusTCP")
 
+        self.__do_reconnect = False
         self.__connected = False
         self.__in_error = False
+        self.__reconnect_event = threading.Event()
         self.__send_event = threading.Event()
-        self.__send_buffer = collections.deque(maxlen=10000)
+        self.__send_buffer = collections.deque(maxlen=consts.MAX_BUFFER_LENGTH)
+
+        # Serial lock event
+        self.__serial_lock = threading.Event()
+        self.unlock()      
                
         self.__options = options
         self.__bridge = bridge
@@ -71,7 +91,7 @@ class Bus():
 
         last_send_time = datetime.now()
 
-        while self.is_active() and not self.in_errror():
+        while self.is_active() and not self.in_error():
             self.__send_event.wait()
             self.__send_event.clear()
 
@@ -82,7 +102,7 @@ class Bus():
                 if not self.is_active():
                     break
 
-                packet = self.__send_buffer.popleft()
+                packet_id, packet = self.__send_buffer.popleft()
 
                 # Ensure that we sleep SEND_DELAY
                 t = datetime.now() - last_send_time
@@ -90,9 +110,13 @@ class Bus():
                     q = SEND_DELAY - t.total_seconds()
                     time.sleep(q)
 
+                # Wait for serial lock to be not set
+                self.__serial_lock.wait()
+
                 # Write packet and set new last send time
                 try:
                     self.__serial_port.write(packet)
+                    self.__bridge.bus_packet_sent(packet_id)
                     self.__logger.debug("[BUS OUT] " + " ".join(hex(x) for x in packet))
                 except Exception as e:
                     self.__logger.exception(e)
@@ -104,8 +128,24 @@ class Bus():
         """
         Called when an error occurred.
         """
-
+    
         self.__in_error = True
+        self.stop() 
+        self.ensure()
+
+    def __reconnect(self):
+        """
+        Reconnects until active.
+        """
+        self.__logger.info("Attempting to connect")
+
+        while self.__do_reconnect and not self.is_active():
+            try:
+                self.start()
+            except:
+                self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
+                self.__reconnect_event.clear()
+                self.__reconnect_event.wait(5)
 
     def __search_for_serial(self):
         """
@@ -138,7 +178,7 @@ class Bus():
 
         return self.__connected
 
-    def in_errror(self):
+    def in_error(self):
         """
         Returns whether or not the serial connection is in error.
 
@@ -147,6 +187,17 @@ class Bus():
 
         return self.__in_error
 
+    def ensure(self):
+        """
+        """
+
+        if not self.is_active():
+            self.__do_reconnect = True
+
+            # Start reconnecting thread
+            _ = threading.Thread(target=self.__reconnect)
+            _.start()
+
     def start(self):
         """
         Starts up the serial communication if the serial connection is not yet active.
@@ -154,6 +205,8 @@ class Bus():
 
         if self.is_active():
             return
+
+        self.__port = None
 
         # If we need to autodiscover port
         if self.__options["autodiscover"]:
@@ -172,7 +225,7 @@ class Bus():
         else:
             self.__port = self.__options["port"]
 
-        if self.__port is None:
+        if self.__port is None or self.__port == '':
             raise ValueError("Couldn't find a port to open communication on")
 
         self.__serial_port = serial.Serial(
@@ -195,11 +248,11 @@ class Bus():
         self.__in_error = False
        
         # Create reader thread
-        self._reader = serial.threaded.ReaderThread(self.__serial_port, VelbusSerialProtocol)
+        protocol = VelbusSerialProtocol()
+        protocol.bridge = self.__bridge
+        protocol.on_error = self.__on_error
+        self._reader = serial.threaded.ReaderThread(self.__serial_port, protocol)
         self._reader.start()
-        self._reader.protocol.bridge = self.__bridge
-        self._reader.protocol.on_error = self.__on_error
-        self._reader.connect()
 
         # Create write thread
         self.__send_thread         = threading.Thread(target=self.__write_thread)
@@ -214,24 +267,46 @@ class Bus():
         Stops the serial communication if the serial connection is active.
         """
 
+        self.__logger.info("Stopping serial connection")
+
+        self.__do_reconnect = False
+        self.__reconnect_event.set()
+
+        # Stop serial connection if active
         if self.is_active():
-
-            self.__logger.info("Stopping serial connection")
-
             self.__connected = False
 
-            if not self.in_errror():
+            if not self.in_error():
                 self._reader.close()
 
             self.__send_event.set()
             self.__send_thread.join()
 
-    def send(self, packet):
+    def send(self, id_packet_tuple):
         """
         Queues a packet to be sent on the serial connection.
 
-        :param packet: The packet that should be sent on the serial connection.
+        :param id_packet_tuple: Tuple of a requestID and packet.
         """
 
-        self.__send_buffer.append(packet)
+        assert isinstance(id_packet_tuple, tuple)
+        packet_id, packet = id_packet_tuple
+        assert isinstance(packet_id, str)
+        assert isinstance(packet, bytearray)
+
+        self.__send_buffer.append(id_packet_tuple)
         self.__send_event.set()
+
+    def lock(self) -> None:
+        """
+        Locks the bus, disabling writes to the bus.
+        """
+        
+        self.__serial_lock.clear()
+
+    def unlock(self) -> None:
+        """
+        Unlocks the bus, allowing writes to the bus.
+        """
+
+        self.__serial_lock.set()

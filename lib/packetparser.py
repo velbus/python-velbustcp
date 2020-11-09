@@ -1,5 +1,6 @@
 import collections
 import itertools
+import logging
 
 from . import consts
 
@@ -23,6 +24,7 @@ class PacketParser:
         """
 
         self.buffer = collections.deque(maxlen=10000)
+        self.logger = logging.getLogger("VelbusTCP")
 
     def __realign_buffer(self):
         """
@@ -175,7 +177,9 @@ class PacketParser:
         # Check if we have a valid packet until we don't have anything left in buffer
         has_valid_packet = self.__has_valid_packet_waiting()
         while (not has_valid_packet) and (len(self.buffer) > HEADER_LENGTH) and self.__has_packet_length_waiting():
+            self.logger.error(f"Realigning |:{list(self.buffer)}:|")
             self.__realign_buffer()
+            self.logger.error(f"Realigned  |:{list(self.buffer)}:|")
             has_valid_packet = self.__has_valid_packet_waiting()
 
         # If we have a valid packet, extract it
