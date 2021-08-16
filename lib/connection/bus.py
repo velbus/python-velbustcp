@@ -105,9 +105,12 @@ class Bus():
                 packet_id, packet = self.__send_buffer.popleft()
 
                 # Ensure that we sleep SEND_DELAY
-                t = datetime.now() - last_send_time
-                if t.total_seconds() < SEND_DELAY:
-                    q = SEND_DELAY - t.total_seconds()
+                delta_time = datetime.now() - last_send_time
+                delta_time_seconds = t.total_seconds()
+                if delta_time_seconds < 0: 
+                    time.sleep(SEND_DELAY)
+                elif delta_time_seconds < SEND_DELAY:
+                    q = SEND_DELAY - delta_time_seconds
                     time.sleep(q)
 
                 # Wait for serial lock to be not set
