@@ -106,7 +106,7 @@ class Bus():
 
                 # Ensure that we sleep SEND_DELAY
                 delta_time = datetime.now() - last_send_time
-                delta_time_seconds = t.total_seconds()
+                delta_time_seconds = delta_time.total_seconds()
                 if delta_time_seconds < 0: 
                     time.sleep(SEND_DELAY)
                 elif delta_time_seconds < SEND_DELAY:
