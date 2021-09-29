@@ -10,7 +10,7 @@ import logging
 from .. import packetparser
 from .. import consts
 
-SEND_DELAY  = 0.05
+SEND_DELAY  = 0.05  # The minimum required time between consecutive bus writes, in seconds
 READ_DELAY  = 0.01
 
 PRODUCT_IDS = ['VID:PID=10CF:0B1B', 'VID:PID=10CF:0516', 'VID:PID=10CF:0517', 'VID:PID=10CF:0518']
@@ -89,7 +89,7 @@ class Bus():
         Thread to safely write to the serial port with a delay.
         """
 
-        last_send_time = datetime.now()
+        last_send_time = time.monotonic()
 
         while self.is_active() and not self.in_error():
             self.__send_event.wait()
@@ -104,14 +104,10 @@ class Bus():
 
                 packet_id, packet = self.__send_buffer.popleft()
 
-                # Ensure that we sleep SEND_DELAY
-                delta_time = datetime.now() - last_send_time
-                delta_time_seconds = delta_time.total_seconds()
-                if delta_time_seconds < 0: 
-                    time.sleep(SEND_DELAY)
-                elif delta_time_seconds < SEND_DELAY:
-                    q = SEND_DELAY - delta_time_seconds
-                    time.sleep(q)
+                # Ensure that we don't write to the bus too fast
+                delta_time = time.monotonic() - last_send_time
+                if delta_time < SEND_DELAY:
+                    time.sleep(SEND_DELAY - delta_time)
 
                 # Wait for serial lock to be not set
                 self.__serial_lock.wait()
@@ -125,7 +121,7 @@ class Bus():
                     self.__logger.exception(e)
                     self.__on_error()
 
-                last_send_time = datetime.now()
+                last_send_time = time.monotonic()
 
     def __on_error(self):
         """
