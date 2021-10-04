@@ -13,22 +13,19 @@ MAX_DATA_AMOUNT     = 8         # Maximum amount of data bytes in a packet
 MIN_PACKET_LENGTH   = 6         # Smallest possible packet: [STX, priority, address, RTR+data length, CRC, ETC]
 
 class PacketParser:
-    """
-    Packet parser for the Velbus protocol.
+    """Packet parser for the Velbus protocol.
     The packet protocol is detailed at https://github.com/velbus/packetprotocol.
     """
 
     def __init__(self):
-        """
-        Initialises the packet parser.
+        """Initialises the packet parser.
         """
 
         self.buffer = collections.deque(maxlen=10000)
-        self.logger = logging.getLogger("VelbusTCP")
+        self.logger = logging.getLogger(__name__)
 
-    def __realign_buffer(self):
-        """
-        Realigns buffer by shifting the queue until the next STX or until the buffer runs out.
+    def __realign_buffer(self) -> None:
+        """Realigns buffer by shifting the queue until the next STX or until the buffer runs out.
         """
 
         amount = 1
@@ -38,23 +35,21 @@ class PacketParser:
 
         self.__shift_buffer(amount)
 
-    def __shift_buffer(self, amount):
-        """
-        Shifts the buffer by the specified amount.
+    def __shift_buffer(self, amount: int) -> None:
+        """Shifts the buffer by the specified amount.
 
-        :param amount: The amount of bytes that the buffer needs to be shifted.
+        Args:
+            amount (int): The amount of bytes that the buffer needs to be shifted.
         """
-
-        assert isinstance(amount, int)
 
         for _ in itertools.repeat(None, amount):
             self.buffer.popleft()
 
-    def __has_valid_header_waiting(self):
-        """
-        Checks whether or not the parser has a valid packet header waiting.
+    def __has_valid_header_waiting(self) -> bool:
+        """Checks whether or not the parser has a valid packet header waiting.
 
-        :return: A boolean indicating whether or not the parser has a valid packet header waiting.
+        Returns:
+            bool: A boolean indicating whether or not the parser has a valid packet header waiting.
         """
 
         # Shortcut if the buffer isn't large enough to have a header
@@ -68,16 +63,16 @@ class PacketParser:
         return start_valid and bodysize_valid and priority_valid
 
     @staticmethod
-    def checksum(arr):
-        """
-        Calculate checksum of the given array.
+    def checksum(arr: bytearray) -> int:
+        """ Calculate checksum of the given array.
 		The checksum is calculated by summing all values in an array, then performing the two's complement.
 
-        :param arr: The array of bytes of which the checksum has to be calculated of.
-        :return: The checksum of the given array.
-        """
+        Args:
+            arr (bytearray): The array of bytes of which the checksum has to be calculated of.
 
-        assert isinstance(arr, bytearray)
+        Returns:
+            int: The checksum of the given array.
+        """
 
         crc = sum(arr)
         crc = crc ^ 0xFF
@@ -86,11 +81,11 @@ class PacketParser:
 
         return crc
 
-    def __has_valid_packet_waiting(self):
-        """
-        Checks whether or not the parser has a valid packet in its buffer.
+    def __has_valid_packet_waiting(self) -> bool:
+        """Checks whether or not the parser has a valid packet in its buffer.
 
-        :return: A boolean indicating whether or not the parser has a valid packet in its buffer.
+        Returns:
+            bool: A boolean indicating whether or not the parser has a valid packet in its buffer.
         """
 
         # Make sure that the header in the packet is valid
@@ -111,40 +106,43 @@ class PacketParser:
 
         return checksum_valid and end_valid
 
-    def __has_packet_length_waiting(self):
-        """
-        Checks whether the current packet has the full length's worth of data waiting in the buffer.
+    def __has_packet_length_waiting(self) -> bool:
+        """Checks whether the current packet has the full length's worth of data waiting in the buffer.
         This should only be called when __has_valid_header_waiting() returns True.
+
+        Returns:
+            bool: Whether or not the buffer has at least the packet length available.
         """
 
         return len(self.buffer) >= self.__curr_packet_length()
 
-    def __curr_packet_length(self):
-        """
-        Gets the current waiting packet's total length.
+    def __curr_packet_length(self) -> int:
+        """Gets the current waiting packet's total length.
         This should only be called when __has_valid_header_waiting() returns True.
 
-        :return: The current waiting packet's total length.
+        Returns:
+            int: The current waiting packet's total length.
         """
+       
 
         return MIN_PACKET_LENGTH + self.__curr_packet_body_length()
 
-    def __curr_packet_body_length(self):
-        """
-        Gets the current waiting packet's body length.
+    def __curr_packet_body_length(self) -> int:
+        """Gets the current waiting packet's body length.
         This should only be called when __has_valid_header_waiting() returns True.
 
-        :return: The current waiting packet's body length.
+        Returns:
+            int: The current waiting packet's body length.
         """
 
         return self.buffer[3] & LENGTH_MASK
 
-    def __extract_packet(self):
-        """
-        Extracts a packet from the buffer and shifts it.
+    def __extract_packet(self) -> bytearray:
+        """Extracts a packet from the buffer and shifts it.
         Make sure this is only called after __has_valid_packet_waiting() return True.
 
-        :return: A bytearray with the currently waiting packet.
+        Returns:
+            bytearray: A bytearray with the currently waiting packet.
         """
 
         length = self.__curr_packet_length()
@@ -153,23 +151,21 @@ class PacketParser:
 
         return packet
 
-    def feed(self, array):
-        """
-        Feed data into the parser to be processed.
+    def feed(self, array: bytearray) -> None:
+        """Feed data into the parser to be processed.
 
-        :param array: The data that will be added to the parser.
+        Args:
+            array (bytearray): The data that will be added to the parser.
         """
         
-        assert isinstance(array, bytearray)
-
         self.buffer.extend(array)
 
-    def next(self):
-        """
-        Attempts to get a packet from the parser.
+    def next(self) -> bytearray:
+        """Attempts to get a packet from the parser.
         This is a safe operation if there are no packets waiting in the parser.
 
-        :return: Will return a bytearray if there is a packet present, None if there is no packet available.
+        Returns:
+            bytearray: Will return a bytearray if there is a packet present, None if there is no packet available.
         """
 
         packet = None

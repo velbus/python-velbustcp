@@ -2,23 +2,23 @@ import threading
 import socket
 import ssl
 import logging
-import sys
-import os
+from typing import Tuple
 
 from velbustcp.lib.packet.packetexcluder import should_accept
-from .client import Client
+from velbustcp.lib.connection.client import Client
+from velbustcp.lib.connection.bridge import Bridge
 
 class Network():
 
-    def __init__(self, options, bridge):
-        """
-        Initialises a TCP network.
+    def __init__(self, options: dict, bridge: Bridge):
+        """Initialises a TCP network.
 
-        :param options: The options used to configure the TCP connection.
-        :param bridge: Bridge object.
+        Args:
+            options (dict): The options used to configure the network.
+            bridge (Bridge): Bridge object to which this network belongs to.
         """
 
-        self.__logger = logging.getLogger("VelbusTCP")
+        self.__logger = logging.getLogger(__name__)
 
         self.__bridge = bridge
         self.__clients = []
@@ -26,36 +26,76 @@ class Network():
         self.__running = False 
         self.__options = options
 
-    def relay(self):
+    def relay(self) -> bool:
+        """Returns whether or not packets are relayed on this network.
+
+        Returns:
+            bool: Whether or not packets are relayed on this network.
+        """
+
         return self.__options["relay"]
 
-    def host(self):
+    def host(self) -> str:
+        """Returns the host that this network is bound to.
+
+        Returns:
+            str: The host of the network.
+        """
+
         return self.__options["host"]
 
-    def port(self):
+    def port(self) -> int:
+        """Returns the port that this network is bound to.
+
+        Returns:
+            int: The port of the network.
+        """
+
         return self.__options["port"]        
 
-    def address(self):
+    def address(self) -> Tuple[str, int]:
+        """Returns the address that this network is bound to.
+
+        Returns:
+            Tuple[str, int]: A tuple containing the host and port of the network.
+        """
+
         return (self.__options["host"], self.__options["port"])
 
-    def has_ssl(self):
+    def has_ssl(self) -> bool:
+        """Returns whether or not TLS/SSL is enabled for this Network.
+
+        Returns:
+            bool: Whether or not TLS/SSL is enabled.
+        """
+
         return self.__options["ssl"] == True
 
-    def has_auth(self):
+    def has_auth(self) -> bool:
+        """Returns whether or not authentication is enabled for this Network.
+
+        Returns:
+            bool: Whether or not authentication is enabled.
+        """
+
         return self.__options["auth"] == True
 
-    def __auth_key(self):
+    def __auth_key(self) -> str:
+        """Returns the authentication key.
+
+        Returns:
+            str: A string containing the authentication key.
+        """
+
         return self.__options["authkey"]
 
-    def send(self, data, excluded_client=None):
-        """
-        Sends given data to all connected clients to the network. If excluded_client is supplied, will skip given excluded_client.
+    def send(self, data: bytearray, excluded_client: Client = None) -> None:
+        """Sends given data to all connected clients to the network. If excluded_client is supplied, will skip given excluded_client.
 
-        :param data: Specifies what data to send to the connected clients
-        :param excluded_client: Specifies which client to skip sending the data to
-        """
-
-        assert isinstance(data, bytearray)
+        Args:
+            data (bytearray): Specifies what data to send to the connected clients
+            excluded_client (Client, optional): Specifies which client to skip sending the data to. Defaults to None.
+        """        
 
         if excluded_client:    
             assert isinstance(excluded_client, Client)
@@ -74,12 +114,9 @@ class Network():
                         except:
                             continue
 
-    def __accept_sockets(self):
+    def __accept_sockets(self) -> None:
+        """Accepts clients from socket, if the tcp server is closed it will also close socket
         """
-        Accepts clients from given socket, if the tcp server is closed it will also close socket
-        """
-
-        assert isinstance(self.__bind_socket, socket.socket)
 
         while self.is_active():
 
@@ -117,18 +154,24 @@ class Network():
         self.__bind_socket.close()
         self.__logger.info("Closed TCP socket")
 
-    def __on_packet_received(self, client, packet):
+    def __on_packet_received(self, client: Client, packet: bytearray):
+        """Called on Client packet receive.
 
-        assert isinstance(client, Client)
-        assert isinstance(packet, bytearray)
-
+        Args:
+            client (Client): The client which received the packet.
+            packet (bytearray): The packet that is received.
+        """
+        
         # Make sure we should accept the packet
         if should_accept(packet, client):
             self.__bridge.tcp_packet_received(self, client, packet)
 
-    def __on_client_close(self, client):
+    def __on_client_close(self, client: Client):
+        """Called on Client tcp connection close.
 
-        assert isinstance(client, Client)
+        Args:
+            client (Client): The client for which the connection closed.
+        """        
 
         # Warning message
         if self.__options["auth"] and not client.is_authorized():
@@ -136,18 +179,17 @@ class Network():
         else:
             self.__logger.info("TCP connection closed {0}".format(str(client.address())))
 
-    def is_active(self):
-        """
-        Returns whether or not the TCP connection is active
+    def is_active(self) -> bool:
+        """Returns whether or not the TCP connection is active
 
-        :return: boolean - Whether or not the TCP connection is active
+        Returns:
+            bool: Whether or not the TCP connection is active
         """
 
         return self.__running
 
-    def start(self):
-        """
-        Starts up the TCP server
+    def start(self) -> None:
+        """Starts up the TCP server
         """
 
         if self.is_active():
@@ -172,9 +214,8 @@ class Network():
         self.__server_thread.name = 'TCP server thread'
         self.__server_thread.start()
 
-    def stop(self):
-        """
-        Stops the TCP server
+    def stop(self) -> None:
+        """Stops the TCP server
         """
     
         if self.is_active():

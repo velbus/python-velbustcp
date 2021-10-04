@@ -1,3 +1,4 @@
+from typing import Callable
 from pytz import timezone, utc
 from tzlocal import get_localzone
 from datetime import datetime, timedelta
@@ -6,37 +7,50 @@ import time
 import logging
 
 from velbustcp.lib.packet.packetparser import PacketParser
-
+from velbustcp.settings import settings_dict
 
 class Ntp():
 
-    def __init__(self, settings, sendcb):
+    def __init__(self, sendcb: Callable):
+        """Initialises the NTP class.
+
+        Args:
+            sendcb (Callable): A callback to send Velbus packets.
+        """
+
+        self.__logger = logging.getLogger(__name__)
+
         self.__is_active = False
         self.__sleep_event = threading.Event()
-        self.__settings = settings
         self.__sendcb = sendcb        
-        self.__logger = logging.getLogger("VelbusTCP")
-
+        self.__settings = settings_dict["ntp"]
         self.__timezone = get_localzone()
 
-    def start(self):
-        """
-        Periodically broadcasts the time on the bus.
+    def start(self) -> None:
+        """Periodically broadcasts the time on the bus.
         """
 
         self.__thread = threading.Thread(target=self.__do_ntp)
         self.__thread.start()
 
-    def is_active(self):
+    def is_active(self) -> bool:
+        """Returns whether or not NTP is active.
+
+        Returns:
+            bool: Whether or not NTP is active.
+        """
+        
         return self.__is_active
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stops the NTP broadcasting.
+        """
+
         self.__is_active = False
         self.__sleep_event.set()
 
-    def __do_ntp(self):
-        """
-        Sleep thread which will send the NTP packets once every hour, and once at start.
+    def __do_ntp(self) -> None:
+        """Sleep thread which will send the NTP packets once every hour, and once at start.
         """
 
         self.__logger.info("Started NTP broadcast, will wait until next minute transition")
@@ -97,9 +111,8 @@ class Ntp():
             dt = until-now
             self.__sleep_event.wait(dt.total_seconds())
 
-    def __send_next_transition(self):
-        """
-        Sends an time packet on the bus on next minute transition.
+    def __send_next_transition(self) -> None:
+        """Sends an time packet on the bus on next minute transition.
         """
 
         # Go to the next minute
@@ -127,12 +140,14 @@ class Ntp():
             self.__sendcb(date_packet)
             self.__sendcb(dst_packet)
 
-    def get_time_packet(self, time):
-        """
-        Prepares a time packet according to passed datetime
-        """
+    def get_time_packet(self, dt: datetime) -> bytearray:
+        """Prepares a time packet according to passed datetime.
 
-        assert isinstance(time, datetime)
+        Args:
+            dt (datetime): The datetime to create a packet for.
+        Returns:
+            bytearray: A Velbus packet containing the time.
+        """
 
         packet = bytearray()
         packet.append(0x0F)
@@ -140,22 +155,24 @@ class Ntp():
         packet.append(0x00)
         packet.append(0x04)
         packet.append(0xD8)
-        packet.append(time.weekday())
-        packet.append(time.hour)
-        packet.append(time.minute)
+        packet.append(dt.weekday())
+        packet.append(dt.hour)
+        packet.append(dt.minute)
         packet.append(PacketParser.checksum(packet))
         packet.append(0x04)
 
         return packet
 
-    def get_date_packet(self, time):
-        """
-        Prepares a date packet according to passed datetime
+    def get_date_packet(self, dt: datetime) -> bytearray:
+        """Prepares a date packet according to passed datetime.
+
+        Args:
+            dt (datetime): The datetime to create a packet for.
+        Returns:
+            bytearray: A Velbus packet containing the date.
         """
 
-        assert isinstance(time, datetime)
-
-        year_bytes = time.year.to_bytes(2, "big")
+        year_bytes = dt.year.to_bytes(2, "big")
 
         packet = bytearray()
         packet.append(0x0F)
@@ -163,8 +180,8 @@ class Ntp():
         packet.append(0x00)
         packet.append(0x05)
         packet.append(0xB7)
-        packet.append(time.day)
-        packet.append(time.month)
+        packet.append(dt.day)
+        packet.append(dt.month)
         packet.append(year_bytes[0])
         packet.append(year_bytes[1])
         packet.append(PacketParser.checksum(packet))
@@ -172,9 +189,11 @@ class Ntp():
 
         return packet
 
-    def get_dst_packet(self):
-        """
-        Prepares a dst packet
+    def get_dst_packet(self) -> bytearray:
+        """Prepares a DST Velbus packet.
+
+        Returns:
+            bytearray: A Velbus packet containing the DST.
         """
 
         packet = bytearray()

@@ -1,11 +1,12 @@
+from typing import List, Tuple
 import serial
 import serial.threaded
 import serial.tools.list_ports
 import threading
 import collections
 import time
-from datetime import datetime
 import logging
+from velbustcp.lib.connection.bridge import Bridge
 
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib import consts
@@ -16,8 +17,7 @@ READ_DELAY  = 0.01
 PRODUCT_IDS = ['VID:PID=10CF:0B1B', 'VID:PID=10CF:0516', 'VID:PID=10CF:0517', 'VID:PID=10CF:0518']
 
 class VelbusSerialProtocol(serial.threaded.Protocol):
-    """
-    Velbus serial protocol.
+    """Velbus serial protocol.
     """
 
     def __init__(self):
@@ -60,19 +60,20 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
 class Bus():
 
-    def __init__(self, options, bridge):
+    __do_reconnect = False
+    __connected = False
+    __in_error = False
+
+    def __init__(self, options: dict, bridge: Bridge):
+        """Initialises a bus connection.
+
+        Args:
+            options (dict):The options used to configure the serial connection.
+            bridge (Bridge): Bridge object to which this Bus belongs to.
         """
-        Initialises a bus connection.
 
-        :param options: The options used to configure the serial connection.
-        :param bridge: Bridge object.
-        """
+        self.__logger = logging.getLogger(__name__)
 
-        self.__logger = logging.getLogger("VelbusTCP")
-
-        self.__do_reconnect = False
-        self.__connected = False
-        self.__in_error = False
         self.__reconnect_event = threading.Event()
         self.__send_event = threading.Event()
         self.__send_buffer = collections.deque(maxlen=consts.MAX_BUFFER_LENGTH)
@@ -84,9 +85,8 @@ class Bus():
         self.__options = options
         self.__bridge = bridge
 
-    def __write_thread(self):
-        """
-        Thread to safely write to the serial port with a delay.
+    def __write_thread(self) -> None:
+        """Thread to safely write to the serial port with a delay.
         """
 
         last_send_time = time.monotonic()
@@ -123,19 +123,18 @@ class Bus():
 
                 last_send_time = time.monotonic()
 
-    def __on_error(self):
-        """
-        Called when an error occurred.
+    def __on_error(self) -> None:
+        """Called when an error occurred.
         """
     
         self.__in_error = True
         self.stop() 
         self.ensure()
 
-    def __reconnect(self):
+    def __reconnect(self) -> None:
+        """Reconnects until active.
         """
-        Reconnects until active.
-        """
+
         self.__logger.info("Attempting to connect")
 
         while self.__do_reconnect and not self.is_active():
@@ -146,11 +145,11 @@ class Bus():
                 self.__reconnect_event.clear()
                 self.__reconnect_event.wait(5)
 
-    def __search_for_serial(self):
-        """
-        Searches the connected serial list for an eligible device.
-
-        :return: An array of strings containing the port(s) on which a connection is possible.
+    def __search_for_serial(self) -> List[str]:
+        """Searches the connected serial list for an eligible device.
+ 
+        Returns:
+            List[str]: A list of strings containing the port(s) on which a connection is possible.
         """
 
         devices = []
@@ -168,26 +167,26 @@ class Bus():
 
         return devices
 
-    def is_active(self):
-        """
-        Returns whether or not the serial connection is active.
+    def is_active(self) -> bool:
+        """Returns whether or not the serial connection is active.
 
-        :return: A boolean indicating whether or not the serial connection is active.
+        Returns:
+            bool: A boolean indicating whether or not the serial connection is active.
         """
 
         return self.__connected
 
-    def in_error(self):
-        """
-        Returns whether or not the serial connection is in error.
+    def in_error(self) -> bool:
+        """Returns whether or not the serial connection is in error.
 
-        :return: A boolean indicating whether or not the serial connection is in error.
+        Returns:
+            bool: A boolean indicating whether or not the serial connection is in error.
         """
 
         return self.__in_error
 
-    def ensure(self):
-        """
+    def ensure(self) -> None:
+        """Ensures that a connection with the bus is established.
         """
 
         if not self.is_active():
@@ -197,9 +196,8 @@ class Bus():
             _ = threading.Thread(target=self.__reconnect)
             _.start()
 
-    def start(self):
-        """
-        Starts up the serial communication if the serial connection is not yet active.
+    def start(self) -> None:
+        """Starts up the serial communication if the serial connection is not yet active.
         """
 
         if self.is_active():
@@ -261,9 +259,8 @@ class Bus():
 
         self.__logger.info("Serial connection active on port {0}".format(self.__port))
 
-    def stop(self):
-        """
-        Stops the serial communication if the serial connection is active.
+    def stop(self) -> None:
+        """Stops the serial communication if the serial connection is active.
         """
 
         self.__logger.info("Stopping serial connection")
@@ -281,31 +278,24 @@ class Bus():
             self.__send_event.set()
             self.__send_thread.join()
 
-    def send(self, id_packet_tuple):
-        """
-        Queues a packet to be sent on the serial connection.
+    def send(self, id_packet_tuple: Tuple[str, bytearray]) -> None:
+        """Queues a packet to be sent on the serial connection.
 
-        :param id_packet_tuple: Tuple of a requestID and packet.
+        Args:
+            id_packet_tuple (Tuple[str, bytearray]): A tuple containing a request ID (str) and data (bytearray)
         """
-
-        assert isinstance(id_packet_tuple, tuple)
-        packet_id, packet = id_packet_tuple
-        assert isinstance(packet_id, str)
-        assert isinstance(packet, bytearray)
 
         self.__send_buffer.append(id_packet_tuple)
         self.__send_event.set()
 
     def lock(self) -> None:
-        """
-        Locks the bus, disabling writes to the bus.
+        """Locks the bus, disabling writes to the bus.
         """
         
         self.__serial_lock.clear()
 
     def unlock(self) -> None:
-        """
-        Unlocks the bus, allowing writes to the bus.
+        """Unlocks the bus, allowing writes to the bus.
         """
 
         self.__serial_lock.set()

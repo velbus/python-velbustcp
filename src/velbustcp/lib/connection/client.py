@@ -1,21 +1,22 @@
 import logging
 import threading
 import socket
+from typing import Any, Callable
 
 from velbustcp.lib.packet.packetparser import PacketParser
 
 class Client():
 
-    def __init__(self, connection, callback, on_close):
-        """
-        Initialises a client.
+    def __init__(self, connection: socket.socket, callback: Callable, on_close: Callable):
+        """Initialises a network client.
+
+        Args:
+            connection (socket.socket): The socket for connection with the client.
+            callback (Callable): Callback for when the client sends a packet.
+            on_close (Callable): Callback for when the client closes the connection.
         """
 
-        assert isinstance(connection, socket.socket)
-        assert callable(callback)
-        assert callable(on_close)        
-
-        self.__logger = logging.getLogger("VelbusTCP")
+        self.__logger = logging.getLogger(__name__)
 
         self.__connection = connection
         self.__callback = callback
@@ -29,9 +30,8 @@ class Client():
         
         self.__is_active = False
 
-    def start(self):
-        """
-        Starts the client to receive.
+    def start(self) -> None:
+        """Starts receiving data from the client.
         """
 
         # Start a thread to handle receive
@@ -39,9 +39,8 @@ class Client():
         self._receive_thread.name = 'Receive from client thread'
         self._receive_thread.start()        
 
-    def stop(self):
-        """
-        Stops the client to receive
+    def stop(self) -> None:
+        """Stops receiving data and disconnects from the client.
         """     
 
         if self.is_active():
@@ -51,48 +50,58 @@ class Client():
 
             self.__on_close(self)
 
-    def send(self, data):
-        """
-        Sends data to the client.
+    def send(self, data: bytearray):
+        """Sends data to the client.
+
+        Args:
+            data (bytearray): The data to be sent.
         """
 
         self.__connection.sendall(data)
 
-    def set_should_authorize(self, authorize_key):
-        """
-        Flags the client so that the client must authorize first before sending messages to the server.
+    def set_should_authorize(self, authorize_key: str) -> None:
+        """Flags the client so that the client must authorize first before sending messages to the server.
+
+        Args:
+            authorize_key (str): The authorization key that must be compared.
         """
 
         self.__authorize_key = authorize_key
         self.__should_authorize = True
 
-    def is_authorized(self):
-        """
-        Whether or not the client is authorized to send messages to the server.
+    def is_authorized(self) -> bool:
+        """Returns whether or not the client is authorized to send messages to the server.
+
+        Returns:
+            bool: Whether or not the client is authorized to send messages to the server.
         """
 
         if not self.__should_authorize:
             return True
         
-        else:
-            return self.__authorized
+        return self.__authorized
     
-    def is_active(self):
+    def is_active(self) -> bool:
+        """Returns whether the client is active for communication. 
+        If applicable, this also means that the client is authenticated.
+
+        Returns:
+            bool: Whether the client is active for communication.
         """
-        Returns whether the client is active for communication. If applicable, this also means that the client is authenticated.
-        """
+
         return self.__is_active
     
-    def address(self):
-        """
-        Address of the client.
+    def address(self) -> Any:
+        """Returns the address of the client.
+
+        Returns:
+            Any: The address of the client.
         """
 
         return self.__address
 
-    def __recv(self):
-        """
-        Handles client communication.
+    def __recv(self) -> None:
+        """Handles communication with the client.
         """
 
         self.__is_active = True
