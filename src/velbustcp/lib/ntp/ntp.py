@@ -1,10 +1,11 @@
 from pytz import timezone, utc
 from tzlocal import get_localzone
 from datetime import datetime, timedelta
-from .packetparser import PacketParser
 import threading
 import time
 import logging
+
+from velbustcp.lib.packet.packetparser import PacketParser
 
 
 class Ntp():

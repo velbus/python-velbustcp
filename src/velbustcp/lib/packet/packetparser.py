@@ -2,7 +2,7 @@ import collections
 import itertools
 import logging
 
-from . import consts
+from velbustcp.lib import consts
 
 # Magic packet numbers
 STX                 = 0x0F

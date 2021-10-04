@@ -1,4 +1,4 @@
-from .connection.client import Client
+from velbustcp.lib.connection.client import Client
 
 def should_accept(packet, client):
 

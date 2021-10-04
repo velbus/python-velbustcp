@@ -7,8 +7,8 @@ import time
 from datetime import datetime
 import logging
 
-from .. import packetparser
-from .. import consts
+from velbustcp.lib.packet.packetparser import PacketParser
+from velbustcp.lib import consts
 
 SEND_DELAY  = 0.05  # The minimum required time between consecutive bus writes, in seconds
 READ_DELAY  = 0.01
@@ -25,7 +25,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         self.bridge = None
         self.on_error = None
 
-        self.__parser = packetparser.PacketParser()
+        self.__parser = PacketParser()
         self.__logger = logging.getLogger("VelbusTCP")
 
     def __call__(self):

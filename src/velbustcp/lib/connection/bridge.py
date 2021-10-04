@@ -1,14 +1,12 @@
 import logging
-import time
-import datetime
 import uuid
 
-from .. import consts
-from .bus import Bus
-from .network import Network
-from .client import Client
-from ..settings import settings_dict
-from ..ntp import Ntp
+from velbustcp.lib import consts
+from velbustcp.lib.connection.bus import Bus
+from velbustcp.lib.connection.network import Network
+from velbustcp.lib.connection.client import Client
+from velbustcp.settings import settings_dict
+from velbustcp.lib.ntp.ntp import Ntp
 
 class Bridge():
     """

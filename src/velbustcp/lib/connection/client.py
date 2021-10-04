@@ -2,7 +2,7 @@ import logging
 import threading
 import socket
 
-from .. import packetparser
+from velbustcp.lib.packet.packetparser import PacketParser
 
 class Client():
 
@@ -108,7 +108,7 @@ class Client():
             if self.__authorize_key == auth_key:
                 self.__authorized = True
                
-        parser = packetparser.PacketParser()                
+        parser = PacketParser()                
 
         # Receive data
         while self.is_active() and self.is_authorized():

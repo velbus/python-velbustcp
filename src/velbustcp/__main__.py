@@ -4,8 +4,9 @@ from threading import Event
 import logging
 import logging.handlers
 
-from lib.connection.bridge import Bridge
-from lib.settings import settings_dict, set_default_settings, validate_and_set_settings
+from velbustcp.lib.connection.bridge import Bridge
+from velbustcp.lib.packet.packetparser import PacketParser
+from velbustcp.settings import settings_dict, set_default_settings, validate_and_set_settings
 
 class Main():
     """

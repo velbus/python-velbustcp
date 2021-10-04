@@ -5,7 +5,7 @@ import logging
 import sys
 import os
 
-from .. import packetexcluder
+from velbustcp.lib.packet.packetexcluder import should_accept
 from .client import Client
 
 class Network():
@@ -69,7 +69,7 @@ class Network():
                     if client.is_active():
 
                         try:
-                            if (client != excluded_client) and packetexcluder.should_accept(data, client):
+                            if (client != excluded_client) and should_accept(data, client):
                                 client.send(data)
                         except:
                             continue
@@ -123,7 +123,7 @@ class Network():
         assert isinstance(packet, bytearray)
 
         # Make sure we should accept the packet
-        if packetexcluder.should_accept(packet, client):
+        if should_accept(packet, client):
             self.__bridge.tcp_packet_received(self, client, packet)
 
     def __on_client_close(self, client):
