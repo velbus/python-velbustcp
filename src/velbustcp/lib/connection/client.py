@@ -7,20 +7,19 @@ from velbustcp.lib.packet.packetparser import PacketParser
 
 class Client():
 
-    def __init__(self, connection: socket.socket, callback: Callable, on_close: Callable):
+    on_packet_receive: Callable[[bytearray], None]
+    on_close: Callable[[Any], None]
+
+    def __init__(self, connection: socket.socket):
         """Initialises a network client.
 
         Args:
             connection (socket.socket): The socket for connection with the client.
-            callback (Callable): Callback for when the client sends a packet.
-            on_close (Callable): Callback for when the client closes the connection.
         """
 
         self.__logger = logging.getLogger(__name__)
 
         self.__connection = connection
-        self.__callback = callback
-        self.__on_close = on_close
         self.__address = connection.getpeername()
 
         # Authorization details
@@ -48,7 +47,8 @@ class Client():
             self.__connection.shutdown(socket.SHUT_RDWR)
             self.__connection.close()
 
-            self.__on_close(self)
+            if self.on_close:
+                self.on_close(self)
 
     def send(self, data: bytearray):
         """Sends data to the client.
@@ -132,7 +132,9 @@ class Client():
                 parser.feed(bytearray(data))
                 packet = parser.next()
                 while packet is not None:
-                    self.__callback(self, packet)
+
+                    if self.on_packet_receive:
+                        self.on_packet_receive(self, packet)
                     
                     packet = parser.next()
 

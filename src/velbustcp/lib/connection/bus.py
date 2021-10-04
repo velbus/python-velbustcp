@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 import serial
 import serial.threaded
 import serial.tools.list_ports
@@ -6,7 +6,6 @@ import threading
 import collections
 import time
 import logging
-from velbustcp.lib.connection.bridge import Bridge
 
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib import consts
@@ -20,19 +19,22 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     """Velbus serial protocol.
     """
 
+    bus_packet_received: Callable[[bytearray], None]
+    on_error: Callable[[], None]
+
     def __init__(self):
 
-        self.bridge = None
         self.on_error = None
 
         self.__parser = PacketParser()
-        self.__logger = logging.getLogger("VelbusTCP")
+        self.__logger = logging.getLogger(__name__)
 
-    def __call__(self):
-        return self
+    def data_received(self, data: bytes):
+        """Called upon serial data receive.
 
-    def data_received(self, data):
-        # pylint: disable-msg=E1101
+        Args:
+            data (bytes): Data received from the serial bus.
+        """
         
         if data:
             self.__logger.debug(bytearray(data))
@@ -42,20 +44,19 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
             packet = self.__parser.next()
 
             while packet:
-                if self.bridge is not None:
-                    self.bridge.bus_packet_received(packet)
 
+                if self.bus_packet_received:
+                    self.bus_packet_received(packet)
+                
                 packet = self.__parser.next()
 
-    def connection_lost(self, exc):
-        # pylint: disable-msg=E1101
-        
+    def connection_lost(self, exc: Exception):     
         self.__logger.error("Connection lost")
 
-        if exc is not None:
+        if exc:
             self.__logger.exception(exc)
 
-        if self.on_error is not None:
+        if self.on_error:
             self.on_error()
 
 class Bus():
@@ -64,12 +65,15 @@ class Bus():
     __connected = False
     __in_error = False
 
-    def __init__(self, options: dict, bridge: Bridge):
+    on_packet_sent: Callable[[str], None]
+    on_packet_received: Callable[[bytearray], None]
+
+    def __init__(self, options: dict):
         """Initialises a bus connection.
 
         Args:
             options (dict):The options used to configure the serial connection.
-            bridge (Bridge): Bridge object to which this Bus belongs to.
+            bus_packet_sent (Callable): Callback for when the bus has sent a packet
         """
 
         self.__logger = logging.getLogger(__name__)
@@ -83,7 +87,6 @@ class Bus():
         self.unlock()      
                
         self.__options = options
-        self.__bridge = bridge
 
     def __write_thread(self) -> None:
         """Thread to safely write to the serial port with a delay.
@@ -115,7 +118,10 @@ class Bus():
                 # Write packet and set new last send time
                 try:
                     self.__serial_port.write(packet)
-                    self.__bridge.bus_packet_sent(packet_id)
+
+                    if self.on_packet_sent:
+                        self.on_packet_sent(packet_id)
+
                     self.__logger.debug("[BUS OUT] " + " ".join(hex(x) for x in packet))
                 except Exception as e:
                     self.__logger.exception(e)
@@ -246,7 +252,7 @@ class Bus():
        
         # Create reader thread
         protocol = VelbusSerialProtocol()
-        protocol.bridge = self.__bridge
+        protocol.bus_packet_received = self.on_packet_received
         protocol.on_error = self.__on_error
         self._reader = serial.threaded.ReaderThread(self.__serial_port, protocol)
         self._reader.start()

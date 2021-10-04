@@ -11,18 +11,16 @@ from velbustcp.settings import settings_dict
 
 class Ntp():
 
-    def __init__(self, sendcb: Callable):
-        """Initialises the NTP class.
+    on_packet_send_request: Callable[[bytearray], None]
 
-        Args:
-            sendcb (Callable): A callback to send Velbus packets.
+    def __init__(self):
+        """Initialises the NTP class.
         """
 
         self.__logger = logging.getLogger(__name__)
 
         self.__is_active = False
         self.__sleep_event = threading.Event()
-        self.__sendcb = sendcb        
         self.__settings = settings_dict["ntp"]
         self.__timezone = get_localzone()
 
@@ -136,9 +134,11 @@ class Ntp():
             dst_packet = self.get_dst_packet()
 
             self.__logger.info("Broadcasting NTP {0}".format(timezoned))
-            self.__sendcb(time_packet)
-            self.__sendcb(date_packet)
-            self.__sendcb(dst_packet)
+
+            if self.on_packet_send_request:
+                self.on_packet_send_request(time_packet)
+                self.on_packet_send_request(date_packet)
+                self.on_packet_send_request(dst_packet)
 
     def get_time_packet(self, dt: datetime) -> bytearray:
         """Prepares a time packet according to passed datetime.

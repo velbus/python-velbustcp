@@ -29,18 +29,23 @@ class Bridge():
         self.__logger = logging.getLogger(__name__)
 
         # Create bus
-        self.__bus = Bus(options=self.__settings["serial"], bridge=self)
+        self.__bus = Bus(options=self.__settings["serial"])
+        self.__bus.on_packet_received = self.bus_packet_received
+        self.__bus.on_packet_sent = self.bus_packet_sent
 
         # Create network connection(s)
         for connection in self.__settings["connections"]:
-            self.__networks.append(Network(options=connection, bridge=self))
+            network = Network(options=connection)
+            network.on_packet_received = self.tcp_packet_received
+            self.__networks.append(network)
 
         # Buffer to track received TCP packets
         # [packet_id] = (client, packet)
         self.__tcp_buffer = {}
 
         # Create NTP
-        self.__ntp = Ntp(self.send)
+        self.__ntp = Ntp()
+        self.__ntp.on_packet_send_request = self.send
         
     def start(self) -> None:
         """Starts bus and TCP network(s).
@@ -62,16 +67,7 @@ class Bridge():
         """
 
         self.queue_packet(packet, None)
-
-    def bus_error(self) -> None:
-        """Called when bus goes into error.
-
-        Closes the bus and attempts to re-open it.
-        """
-
-        self.__bus.stop()
-        self.start()
-    
+   
     def bus_packet_received(self, packet: bytearray):
         """Called when the serial connection receives a packet.
 

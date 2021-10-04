@@ -2,25 +2,25 @@ import threading
 import socket
 import ssl
 import logging
-from typing import Tuple
+from typing import Any, Callable, Tuple
 
 from velbustcp.lib.packet.packetexcluder import should_accept
 from velbustcp.lib.connection.client import Client
-from velbustcp.lib.connection.bridge import Bridge
 
 class Network():
 
-    def __init__(self, options: dict, bridge: Bridge):
+    on_packet_received: Callable[[Any, Client, bytearray], None]
+    #on_packet_sent: Callable[[bytearray], None]
+
+    def __init__(self, options: dict):
         """Initialises a TCP network.
 
         Args:
             options (dict): The options used to configure the network.
-            bridge (Bridge): Bridge object to which this network belongs to.
         """
 
         self.__logger = logging.getLogger(__name__)
 
-        self.__bridge = bridge
         self.__clients = []
         self.__clients_lock = threading.Lock()
         self.__running = False 
@@ -138,6 +138,7 @@ class Network():
                             raise e
 
                     client = Client(connection, self.__on_packet_received, self.__on_client_close)
+                    client.on_packet_receive = self.__on_packet_received
 
                     if self.has_auth():
                         client.set_should_authorize(self.__auth_key())
@@ -164,7 +165,9 @@ class Network():
         
         # Make sure we should accept the packet
         if should_accept(packet, client):
-            self.__bridge.tcp_packet_received(self, client, packet)
+
+            if self.on_packet_received:
+                self.on_packet_received(self, client, packet)
 
     def __on_client_close(self, client: Client):
         """Called on Client tcp connection close.
