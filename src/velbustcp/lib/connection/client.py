@@ -8,7 +8,7 @@ from velbustcp.lib.packet.packetparser import PacketParser
 class Client():
 
     on_packet_receive: Callable[[bytearray], None]
-    on_close: Callable[[Any], None]
+    on_close: Callable[[], None]
 
     def __init__(self, connection: socket.socket):
         """Initialises a network client.

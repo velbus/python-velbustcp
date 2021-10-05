@@ -9,7 +9,7 @@ from velbustcp.lib.connection.client import Client
 
 class Network():
 
-    on_packet_received: Callable[[Any, Client, bytearray], None]
+    on_packet_received: Callable[[Client, bytearray], None]
     #on_packet_sent: Callable[[bytearray], None]
 
     def __init__(self, options: dict):
@@ -137,8 +137,9 @@ class Network():
                             self.__logger.error("Couldn't wrap socket")
                             raise e
 
-                    client = Client(connection, self.__on_packet_received, self.__on_client_close)
+                    client = Client(connection)
                     client.on_packet_receive = self.__on_packet_received
+                    client.on_close = self.__on_client_close
 
                     if self.has_auth():
                         client.set_should_authorize(self.__auth_key())
