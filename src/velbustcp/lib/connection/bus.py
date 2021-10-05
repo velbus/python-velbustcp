@@ -27,7 +27,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         self.__parser = PacketParser()
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
-        return super().__call__(*args, **kwds)
+        return self
 
     def data_received(self, data: bytes):
         """Called upon serial data receive.
