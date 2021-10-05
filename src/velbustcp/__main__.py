@@ -39,7 +39,7 @@ class Main():
 
 def setup_logging():
     
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("velbustcp")
 
     if settings_dict["logging"]["type"] == "debug":
         logger.setLevel(logging.DEBUG)
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         set_default_settings()
 
     # Setup logging
-    logger = setup_logging()   
+    logger = setup_logging()
 
     # Create main class
     main = Main()

@@ -23,12 +23,8 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     on_error: Callable[[], None]
 
     def __init__(self):
-
-        self.on_error = NoneA
-
-        self.__parser = PacketParser()
         self.__logger = logging.getLogger(__name__)
-
+        self.__parser = PacketParser()
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         return super().__call__(*args, **kwds)
@@ -80,14 +76,14 @@ class Bus():
         """
 
         self.__logger = logging.getLogger(__name__)
-
+ 
         self.__reconnect_event = threading.Event()
         self.__send_event = threading.Event()
         self.__send_buffer = collections.deque(maxlen=consts.MAX_BUFFER_LENGTH)
 
         # Serial lock event
         self.__serial_lock = threading.Event()
-        self.unlock()      
+        self.unlock()
                
         self.__options = options
 
@@ -255,7 +251,7 @@ class Bus():
        
         # Create reader thread
         protocol = VelbusSerialProtocol()
-        protocol.bus_packet_received = self.on_packet_received
+        protocol.bus_packet_received = self.__on_packet_received
         protocol.on_error = self.__on_error
         self._reader = serial.threaded.ReaderThread(self.__serial_port, protocol)
         self._reader.start()
@@ -308,3 +304,13 @@ class Bus():
         """
 
         self.__serial_lock.set()
+
+    def __on_packet_received(self, packet: bytearray) -> None:
+        """Called when a packet is received from the bus. Propagates it to its callback.
+
+        Args:
+            packet (bytearray): The packet that has been received.
+        """
+
+        if self.on_packet_received:
+            self.on_packet_received(packet)
