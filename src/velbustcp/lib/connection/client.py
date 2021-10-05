@@ -1,14 +1,25 @@
 import logging
 import threading
 import socket
-from typing import Any, Callable
+from typing import Any, Protocol
 
 from velbustcp.lib.packet.packetparser import PacketParser
 
+
+class OnClientPacketReceived(Protocol):
+    def __call__(self, client: Any, packet: bytearray) -> None:
+        pass
+
+
+class OnClientClose(Protocol):
+    def __call__(self, client: Any) -> None:
+        pass
+
+
 class Client():
 
-    on_packet_receive: Callable[[bytearray], None]
-    on_close: Callable[[], None]
+    on_packet_receive: OnClientPacketReceived
+    on_close: OnClientClose
 
     def __init__(self, connection: socket.socket):
         """Initialises a network client.
@@ -26,7 +37,7 @@ class Client():
         self.__should_authorize = False
         self.__authorized = False
         self.__authorize_key = ""
-        
+
         self.__is_active = False
 
     def start(self) -> None:
@@ -34,13 +45,13 @@ class Client():
         """
 
         # Start a thread to handle receive
-        self._receive_thread      = threading.Thread(target=self.__recv)
+        self._receive_thread = threading.Thread(target=self.__recv)
         self._receive_thread.name = 'Receive from client thread'
-        self._receive_thread.start()        
+        self._receive_thread.start()
 
     def stop(self) -> None:
         """Stops receiving data and disconnects from the client.
-        """     
+        """
 
         if self.is_active():
             self.__is_active = False
@@ -78,11 +89,11 @@ class Client():
 
         if not self.__should_authorize:
             return True
-        
+
         return self.__authorized
-    
+
     def is_active(self) -> bool:
-        """Returns whether the client is active for communication. 
+        """Returns whether the client is active for communication.
         If applicable, this also means that the client is authenticated.
 
         Returns:
@@ -90,7 +101,7 @@ class Client():
         """
 
         return self.__is_active
-    
+
     def address(self) -> Any:
         """Returns the address of the client.
 
@@ -111,13 +122,13 @@ class Client():
 
             try:
                 auth_key = self.__connection.recv(1024).decode("utf-8").strip()
-            except:
+            except Exception:
                 self.stop()
 
             if self.__authorize_key == auth_key:
                 self.__authorized = True
-               
-        parser = PacketParser()                
+
+        parser = PacketParser()
 
         # Receive data
         while self.is_active() and self.is_authorized():
@@ -135,7 +146,7 @@ class Client():
 
                     if self.on_packet_receive:
                         self.on_packet_receive(self, packet)
-                    
+
                     packet = parser.next()
 
             except Exception as e:

@@ -1,5 +1,5 @@
-from typing import Callable
-from pytz import timezone, utc
+from typing import Callable, Optional
+from pytz import utc
 from tzlocal import get_localzone
 from datetime import datetime, timedelta
 import threading
@@ -9,9 +9,10 @@ import logging
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.settings import settings_dict
 
+
 class Ntp():
 
-    on_packet_send_request: Callable[[bytearray], None]
+    on_packet_send_request: Optional[Callable[[bytearray], None]]
 
     def __init__(self):
         """Initialises the NTP class.
@@ -37,7 +38,7 @@ class Ntp():
         Returns:
             bool: Whether or not NTP is active.
         """
-        
+
         return self.__is_active
 
     def stop(self) -> None:
@@ -56,7 +57,7 @@ class Ntp():
         self.__is_active = True
 
         while True and self.is_active():
-            
+
             # Send the NTP packets on next minute transition
             self.__send_next_transition()
 
@@ -71,11 +72,13 @@ class Ntp():
             now = utc.localize(datetime.utcnow()).astimezone(self.__timezone)
 
             # DST
-            until_dst = next(time for time in self.__timezone._utc_transition_times if time > datetime.utcnow())
-            until_dst = utc.localize(until_dst).astimezone(self.__timezone)            
-            
+            until_dst = now + timedelta(days=1)
+            if hasattr(self.__timezone, "_utc_transition_times"):
+                until_dst = next(time for time in self.__timezone._utc_transition_times if time > datetime.utcnow())    # type: ignore
+                until_dst = utc.localize(until_dst).astimezone(self.__timezone)
+
             # No synctime: one hour
-            if (not "synctime" in self.__settings) or ("synctime" in self.__settings and self.__settings["synctime"] == ""):
+            if ("synctime" not in self.__settings) or ("synctime" in self.__settings and self.__settings["synctime"] == ""):
                 until_synctime = now + timedelta(hours=1) - timedelta(minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
 
                 if until_synctime < until_dst:
@@ -100,11 +103,11 @@ class Ntp():
                 if until_timesync < until_dst:
                     until = until_timesync
                 else:
-                    until = until_dst    
+                    until = until_dst
 
             self.__logger.info("Waiting for next NTP broadcast at {0}".format(until))
-            
-            # Sleep until a minute before 
+
+            # Sleep until a minute before
             until = until - timedelta(minutes=1)
             dt = until-now
             self.__sleep_event.wait(dt.total_seconds())
@@ -116,11 +119,11 @@ class Ntp():
         # Go to the next minute
         now = datetime.utcnow()
         until = now + timedelta(minutes=1) - timedelta(seconds=now.second, microseconds=now.microsecond)
-        
+
         # Wait until we passed the 'until' time
         while (datetime.utcnow() < until) and self.is_active():
             time.sleep(0.1)
-        
+
         # Now that we're at the minute transition, send the packet
         if self.is_active():
 

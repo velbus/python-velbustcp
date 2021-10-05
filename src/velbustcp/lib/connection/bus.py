@@ -1,4 +1,4 @@
-from typing import Any, Callable, List, Tuple
+from typing import Any, Deque, Dict, List, Protocol, Tuple
 import serial
 import serial.threaded
 import serial.tools.list_ports
@@ -10,17 +10,28 @@ import logging
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib import consts
 
-SEND_DELAY  = 0.05  # The minimum required time between consecutive bus writes, in seconds
-READ_DELAY  = 0.01
+SEND_DELAY = 0.05  # The minimum required time between consecutive bus writes, in seconds
+READ_DELAY = 0.01
 
 PRODUCT_IDS = ['VID:PID=10CF:0B1B', 'VID:PID=10CF:0516', 'VID:PID=10CF:0517', 'VID:PID=10CF:0518']
+
+
+class OnBusPacketReceived(Protocol):
+    def __call__(self, packet: bytearray) -> None:
+        pass
+
+
+class OnBusError(Protocol):
+    def __call__(self) -> None:
+        pass
+
 
 class VelbusSerialProtocol(serial.threaded.Protocol):
     """Velbus serial protocol.
     """
 
-    bus_packet_received: Callable[[bytearray], None]
-    on_error: Callable[[], None]
+    bus_packet_received: OnBusPacketReceived
+    on_error: OnBusError
 
     def __init__(self):
         self.__logger = logging.getLogger(__name__)
@@ -35,7 +46,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         Args:
             data (bytes): Data received from the serial bus.
         """
-        
+
         if data:
             self.__logger.debug(bytearray(data))
             self.__parser.feed(bytearray(data))
@@ -47,10 +58,10 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
                 if self.bus_packet_received:
                     self.bus_packet_received(packet)
-                
+
                 packet = self.__parser.next()
 
-    def connection_lost(self, exc: Exception):     
+    def connection_lost(self, exc: Exception):
         self.__logger.error("Connection lost")
 
         if exc:
@@ -59,16 +70,23 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         if self.on_error:
             self.on_error()
 
+
+class OnBusPacketSent(Protocol):
+    def __call__(self, packet_id: str) -> None:
+        pass
+
+
 class Bus():
 
     __do_reconnect = False
     __connected = False
     __in_error = False
+    __send_buffer: Deque[Tuple[str, bytearray]]
 
-    on_packet_sent: Callable[[str], None]
-    on_packet_received: Callable[[bytearray], None]
+    on_packet_sent: OnBusPacketSent
+    on_packet_received: OnBusPacketReceived
 
-    def __init__(self, options: dict):
+    def __init__(self, options: Dict[str, Any]):
         """Initialises a bus connection.
 
         Args:
@@ -76,7 +94,7 @@ class Bus():
         """
 
         self.__logger = logging.getLogger(__name__)
- 
+
         self.__reconnect_event = threading.Event()
         self.__send_event = threading.Event()
         self.__send_buffer = collections.deque(maxlen=consts.MAX_BUFFER_LENGTH)
@@ -84,7 +102,7 @@ class Bus():
         # Serial lock event
         self.__serial_lock = threading.Event()
         self.unlock()
-               
+
         self.__options = options
 
     def __write_thread(self) -> None:
@@ -131,9 +149,9 @@ class Bus():
     def __on_error(self) -> None:
         """Called when an error occurred.
         """
-    
+
         self.__in_error = True
-        self.stop() 
+        self.stop()
         self.ensure()
 
     def __reconnect(self) -> None:
@@ -145,14 +163,14 @@ class Bus():
         while self.__do_reconnect and not self.is_active():
             try:
                 self.start()
-            except:
+            except Exception:
                 self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
                 self.__reconnect_event.clear()
                 self.__reconnect_event.wait(5)
 
     def __search_for_serial(self) -> List[str]:
         """Searches the connected serial list for an eligible device.
- 
+
         Returns:
             List[str]: A list of strings containing the port(s) on which a connection is possible.
         """
@@ -160,14 +178,14 @@ class Bus():
         devices = []
 
         for port in serial.tools.list_ports.comports():
-            try:                
+            try:
                 # Found, try open it first
                 if any(product_id in port.hwid for product_id in PRODUCT_IDS):
                     try_open_port = serial.Serial(port=port.device)
                     try_open_port.close()
                     devices.append(port.device)
 
-            except Exception as e:
+            except Exception:
                 pass
 
         return devices
@@ -212,14 +230,14 @@ class Bus():
 
         # If we need to autodiscover port
         if self.__options["autodiscover"]:
-           
+
             ports = self.__search_for_serial()
-            
+
             if len(ports) > 0:
                 self.__logger.info("Autodiscovered {0} port(s): {1}".format(len(ports), ports))
                 self.__logger.info("Choosing {0}".format(ports[0]))
                 self.__port = ports[0]
-                
+
             else:
                 self.__port = self.__options["port"]
 
@@ -231,15 +249,15 @@ class Bus():
             raise ValueError("Couldn't find a port to open communication on")
 
         self.__serial_port = serial.Serial(
-            port        = self.__port,
-            baudrate    = 38400,
-            parity      = serial.PARITY_NONE,
-            stopbits    = serial.STOPBITS_ONE,
-            bytesize    = serial.EIGHTBITS,
-            xonxoff     = 0,
-            timeout     = None,
-            dsrdtr      = 0,
-            rtscts      = 0,
+            port=self.__port,
+            baudrate=38400,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            xonxoff=0,
+            timeout=None,
+            dsrdtr=0,
+            rtscts=0,
         )
 
         if not self.__serial_port.isOpen():
@@ -248,7 +266,7 @@ class Bus():
         # Now that we're connected, set connected state
         self.__connected = True
         self.__in_error = False
-       
+
         # Create reader thread
         protocol = VelbusSerialProtocol()
         protocol.bus_packet_received = self.__on_packet_received
@@ -257,9 +275,9 @@ class Bus():
         self._reader.start()
 
         # Create write thread
-        self.__send_thread         = threading.Thread(target=self.__write_thread)
-        self.__send_thread.daemon  = True
-        self.__send_thread.name    = 'Serial writing thread'
+        self.__send_thread = threading.Thread(target=self.__write_thread)
+        self.__send_thread.daemon = True
+        self.__send_thread.name = 'Serial writing thread'
         self.__send_thread.start()
 
         self.__logger.info("Serial connection active on port {0}".format(self.__port))
@@ -296,7 +314,7 @@ class Bus():
     def lock(self) -> None:
         """Locks the bus, disabling writes to the bus.
         """
-        
+
         self.__serial_lock.clear()
 
     def unlock(self) -> None:

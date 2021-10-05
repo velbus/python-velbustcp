@@ -1,16 +1,18 @@
 import collections
 import itertools
 import logging
+from typing import Deque, Optional
 
 from velbustcp.lib import consts
 
 # Magic packet numbers
-STX                 = 0x0F
-ETX                 = 0x04
-LENGTH_MASK         = 0x0F
-HEADER_LENGTH       = 4         # Header: [STX, priority, address, RTR+data length]
-MAX_DATA_AMOUNT     = 8         # Maximum amount of data bytes in a packet
-MIN_PACKET_LENGTH   = 6         # Smallest possible packet: [STX, priority, address, RTR+data length, CRC, ETC]
+STX = 0x0F
+ETX = 0x04
+LENGTH_MASK = 0x0F
+HEADER_LENGTH = 4       # Header: [STX, priority, address, RTR+data length]
+MAX_DATA_AMOUNT = 8     # Maximum amount of data bytes in a packet
+MIN_PACKET_LENGTH = 6   # Smallest possible packet: [STX, priority, address, RTR+data length, CRC, ETC]
+
 
 class PacketParser:
     """Packet parser for the Velbus protocol.
@@ -21,7 +23,7 @@ class PacketParser:
         """Initialises the packet parser.
         """
 
-        self.buffer = collections.deque(maxlen=10000)
+        self.buffer: Deque[int] = collections.deque(maxlen=10000)
         self.logger = logging.getLogger(__name__)
 
     def __realign_buffer(self) -> None:
@@ -56,16 +58,16 @@ class PacketParser:
         if len(self.buffer) < HEADER_LENGTH:
             return False
 
-        start_valid      = self.buffer[0] == STX
-        bodysize_valid   = self.__curr_packet_body_length() <= MAX_DATA_AMOUNT
-        priority_valid   = self.buffer[1] in consts.PRIORITIES
+        start_valid = self.buffer[0] == STX
+        bodysize_valid = self.__curr_packet_body_length() <= MAX_DATA_AMOUNT
+        priority_valid = self.buffer[1] in consts.PRIORITIES
 
         return start_valid and bodysize_valid and priority_valid
 
     @staticmethod
     def checksum(arr: bytearray) -> int:
         """ Calculate checksum of the given array.
-		The checksum is calculated by summing all values in an array, then performing the two's complement.
+        The checksum is calculated by summing all values in an array, then performing the two's complement.
 
         Args:
             arr (bytearray): The array of bytes of which the checksum has to be calculated of.
@@ -95,14 +97,14 @@ class PacketParser:
         # Shortcut if we don't have enough bytes in the buffer to have a valid packet
         if len(self.buffer) < MIN_PACKET_LENGTH:
             return False
-      
+
         # Shortcut if we don't have enough bytes to complete the packet length specified in body
         if not self.__has_packet_length_waiting():
             return False
 
-        bytes_to_check  = bytearray(itertools.islice(self.buffer, 0, 4 + self.__curr_packet_body_length()))
-        checksum_valid  = self.buffer[self.__curr_packet_length() - 2] == self.checksum(bytes_to_check)
-        end_valid       = self.buffer[self.__curr_packet_length() - 1] == ETX
+        bytes_to_check = bytearray(itertools.islice(self.buffer, 0, 4 + self.__curr_packet_body_length()))
+        checksum_valid = self.buffer[self.__curr_packet_length() - 2] == self.checksum(bytes_to_check)
+        end_valid = self.buffer[self.__curr_packet_length() - 1] == ETX
 
         return checksum_valid and end_valid
 
@@ -123,7 +125,6 @@ class PacketParser:
         Returns:
             int: The current waiting packet's total length.
         """
-       
 
         return MIN_PACKET_LENGTH + self.__curr_packet_body_length()
 
@@ -157,10 +158,10 @@ class PacketParser:
         Args:
             array (bytearray): The data that will be added to the parser.
         """
-        
+
         self.buffer.extend(array)
 
-    def next(self) -> bytearray:
+    def next(self) -> Optional[bytearray]:
         """Attempts to get a packet from the parser.
         This is a safe operation if there are no packets waiting in the parser.
 
@@ -180,6 +181,6 @@ class PacketParser:
 
         # If we have a valid packet, extract it
         if has_valid_packet:
-            packet = self.__extract_packet()   
+            packet = self.__extract_packet()
 
         return packet

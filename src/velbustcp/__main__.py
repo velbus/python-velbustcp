@@ -7,6 +7,7 @@ import logging.handlers
 from velbustcp.lib.connection.bridge import Bridge
 from velbustcp.settings import settings_dict, set_default_settings, validate_and_set_settings
 
+
 class Main():
     """Main class for the Velbus-TCP connection.
 
@@ -37,8 +38,14 @@ class Main():
 
         self.__bridge.stop()
 
-def setup_logging():
-    
+
+def setup_logging() -> logging.Logger:
+    """Sets up logging for the library.
+
+    Returns:
+        logging.Logger: The set-up logger.
+    """
+
     logger = logging.getLogger("velbustcp")
 
     if settings_dict["logging"]["type"] == "debug":
@@ -46,24 +53,23 @@ def setup_logging():
     else:
         logger.setLevel(logging.INFO)
 
-    handler = None
+    handler: logging.Handler = logging.StreamHandler()
 
     if settings_dict["logging"]["output"] == "syslog":
         handler = logging.handlers.SysLogHandler()
-    else:
-        handler = logging.StreamHandler()
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    
-    return logger          
-         
+
+    return logger
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Velbus communication")
     parser.add_argument("--settings", help="Settings file", required=False)
-    args = parser.parse_args()   
+    args = parser.parse_args()
 
     # If settings are supplied, read and validate them
     if args.settings:
@@ -73,7 +79,7 @@ if __name__ == '__main__':
             settings = json.load(f)
 
         validate_and_set_settings(settings)
-    
+
     else:
         # Set default settings
         set_default_settings()
