@@ -110,7 +110,7 @@ class Ntp():
             self.__sleep_event.wait(dt.total_seconds())
 
     def __send_next_transition(self) -> None:
-        """Sends an time packet on the bus on next minute transition.
+        """Sends a time packet on the bus on next minute transition.
         """
 
         # Go to the next minute
