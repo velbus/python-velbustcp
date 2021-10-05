@@ -29,6 +29,10 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         self.__parser = PacketParser()
         self.__logger = logging.getLogger(__name__)
 
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        return super().__call__(*args, **kwds)
+
     def data_received(self, data: bytes):
         """Called upon serial data receive.
 
@@ -73,7 +77,6 @@ class Bus():
 
         Args:
             options (dict):The options used to configure the serial connection.
-            bus_packet_sent (Callable): Callback for when the bus has sent a packet
         """
 
         self.__logger = logging.getLogger(__name__)
