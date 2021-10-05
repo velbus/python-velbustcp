@@ -1,4 +1,4 @@
-from typing import Callable, List, Tuple
+from typing import Any, Callable, List, Tuple
 import serial
 import serial.threaded
 import serial.tools.list_ports
@@ -24,7 +24,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
     def __init__(self):
 
-        self.on_error = None
+        self.on_error = NoneA
 
         self.__parser = PacketParser()
         self.__logger = logging.getLogger(__name__)
