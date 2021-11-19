@@ -6,7 +6,7 @@ from velbustcp.lib import consts
 from velbustcp.lib.connection.bus import Bus
 from velbustcp.lib.connection.network import Network
 from velbustcp.lib.connection.client import Client
-from velbustcp.lib.settings.settings import logging_settings, serial_settings, network_settings, ntp_settings
+from velbustcp.lib.settings.settings import serial_settings, network_settings, ntp_settings
 from velbustcp.lib.ntp.ntp import Ntp
 
 

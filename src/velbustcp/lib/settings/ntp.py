@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import Dict
+
 
 class NtpSettings():
 
@@ -6,7 +8,7 @@ class NtpSettings():
     synctime: str = ""
 
     @staticmethod
-    def parse(settings_dict: dict) -> NtpSettings:
+    def parse(settings_dict: Dict) -> NtpSettings:  # type: ignore
 
         settings = NtpSettings()
 
@@ -32,5 +34,5 @@ class NtpSettings():
                 raise ValueError("The provided sync time minute is invalid '{0}'".format(mm))
 
             settings.synctime = settings_dict["synctime"]
-        
+
         return settings

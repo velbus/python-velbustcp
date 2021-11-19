@@ -1,4 +1,4 @@
-from typing import Any, Deque, Dict, List, Protocol, Tuple
+from typing import Any, Deque, List, Protocol, Tuple
 import serial
 import serial.threaded
 import serial.tools.list_ports

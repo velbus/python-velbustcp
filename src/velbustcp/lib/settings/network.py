@@ -1,6 +1,8 @@
 from __future__ import annotations
 import ipaddress
+import os
 from typing import Dict, Tuple
+
 
 class NetworkSettings():
 
@@ -18,9 +20,9 @@ class NetworkSettings():
         return (self.host, self.port)
 
     @staticmethod
-    def parse(settings_dict: Dict) -> NetworkSettings:
+    def parse(settings_dict: Dict) -> NetworkSettings:  # type: ignore
         settings = NetworkSettings()
-            
+
         # Host
         if "host" in settings_dict:
             settings.host = settings_dict["host"]
@@ -28,7 +30,7 @@ class NetworkSettings():
             # Make sure host is empty (all), or a valid IPv4/IPv6
             if settings.host:
                 ipaddress.ip_address(settings.host)
-        
+
         else:
             settings.host = ""
 
@@ -81,7 +83,7 @@ class NetworkSettings():
                     raise ValueError("No auth key provided or is empty")
 
                 settings.auth_key = settings_dict["auth_key"]
-        
+
         else:
             settings.auth = False
 

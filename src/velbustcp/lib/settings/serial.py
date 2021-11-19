@@ -1,13 +1,14 @@
 from __future__ import annotations
 from typing import Dict
 
+
 class SerialSettings():
 
     port: str = ""
     autodiscover: bool = True
 
     @staticmethod
-    def parse(settings_dict: Dict) -> SerialSettings:
+    def parse(settings_dict: Dict) -> SerialSettings:   # type: ignore
         settings = SerialSettings()
 
         # Port
@@ -17,5 +18,5 @@ class SerialSettings():
         # Autodiscover
         if "autodiscover" in settings_dict:
             settings.autodiscover = bool(settings_dict["autodiscover"])
-        
+
         return settings

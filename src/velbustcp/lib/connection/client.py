@@ -134,11 +134,9 @@ class Client():
                 raise Exception("Client disconnected before receiving authorization key")
 
             self.__authorized = self.__connection.authorization_key == data.decode("utf-8").strip()
-        
+
         except Exception:
             self.__logger.warn(f"Authorization failed for {self.address()}")
-
-        return self.__authorized
 
     def __handle_packets(self) -> None:
         """Receives packet until client is no longer active.
@@ -167,5 +165,5 @@ class Client():
                     packet = parser.next()
 
             # If an exception is thrown, log it
-            except Exception as e:
+            except Exception:
                 self.__logger.exception("Exception during packet receiving")

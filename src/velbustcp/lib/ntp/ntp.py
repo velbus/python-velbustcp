@@ -8,7 +8,7 @@ import logging
 
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.settings.ntp import NtpSettings
-from velbustcp.lib.settings.settings import ntp_settings
+
 
 class Ntp():
 

@@ -10,23 +10,28 @@ serial_settings: SerialSettings = SerialSettings()
 ntp_settings: NtpSettings = NtpSettings()
 logging_settings: LoggingSettings = LoggingSettings()
 
+
 def validate_and_set_settings(settings):
 
     # NTP configuration
     if "ntp" in settings:
+        global ntp_settings
         ntp_settings = NtpSettings.parse(settings["ntp"])
-    
+
     # Has connection(s)
     if "connections" in settings:
-        network_settings = [] # clear default
+        global network_settings
+        network_settings = []  # clear default
 
         for connection in settings["connections"]:
             network_settings.append(NetworkSettings.parse(connection))
 
     # Serial
     if "serial" in settings:
+        global serial_settings
         serial_settings = SerialSettings.parse(settings)
 
     # Logging
     if "logging" in settings:
+        global logging_settings
         logging_settings = LoggingSettings.parse(settings)

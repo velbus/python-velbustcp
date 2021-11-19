@@ -1,13 +1,14 @@
 from __future__ import annotations
 from typing import Dict
 
+
 class LoggingSettings():
 
     type: str = "info"
     output: str = "stream"
 
     @staticmethod
-    def parse(settings_dict: Dict) -> LoggingSettings:
+    def parse(settings_dict: Dict) -> LoggingSettings:  # type: ignore
         settings = LoggingSettings()
 
         if "type" in settings_dict:

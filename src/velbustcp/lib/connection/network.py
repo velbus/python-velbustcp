@@ -3,7 +3,7 @@ import socket
 import ssl
 import logging
 import sys
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
@@ -113,7 +113,7 @@ class Network():
                     with self.__clients_lock:
                         self.__clients.append(client)
 
-            except Exception as e:
+            except Exception:
                 self.__logger.exception("Couldn't accept socket")
 
     def __on_packet_received(self, client: Client, packet: bytearray):
@@ -166,7 +166,7 @@ class Network():
 
         if self.__options.ssl:
             self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            self.__context.load_cert_chain(self.__options["cert"], keyfile=self.__options["pk"])
+            self.__context.load_cert_chain(self.__options.cert, keyfile=self.__options.pk)
 
         self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
 
