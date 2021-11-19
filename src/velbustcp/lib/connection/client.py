@@ -1,7 +1,13 @@
 import logging
 import threading
 import socket
-from typing import Any, Protocol
+import sys
+from typing import Any
+
+if sys.version_info >= (3, 8):
+    from typing import Protocol
+else:
+    from typing_extensions import Protocol
 
 from velbustcp.lib.packet.packetparser import PacketParser
 

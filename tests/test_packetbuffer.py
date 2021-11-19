@@ -20,8 +20,9 @@ def test_realign(data, expected_result):
 
 indexing_data = [
     (0, 0x01),                             # Single item indexing [0]
-    (slice(0,2), bytearray([0x01, 0x02]))  # Indexing by slicing [0:2]
+    (slice(0, 2), bytearray([0x01, 0x02]))  # Indexing by slicing [0:2]
 ]
+
 
 @pytest.mark.parametrize("data, expected_result", indexing_data)
 def test_index(data, expected_result):
