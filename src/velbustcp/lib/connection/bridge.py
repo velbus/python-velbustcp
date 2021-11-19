@@ -6,7 +6,7 @@ from velbustcp.lib import consts
 from velbustcp.lib.connection.bus import Bus
 from velbustcp.lib.connection.network import Network
 from velbustcp.lib.connection.client import Client
-from velbustcp.settings import settings_dict
+from velbustcp.lib.settings.settings import logging_settings, serial_settings, network_settings, ntp_settings
 from velbustcp.lib.ntp.ntp import Ntp
 
 
@@ -24,18 +24,16 @@ class Bridge():
         """Initialises the Bridge class.
         """
 
-        self.__settings = settings_dict
-
         # Logger
         self.__logger = logging.getLogger(__name__)
 
         # Create bus
-        self.__bus = Bus(options=self.__settings["serial"])
+        self.__bus = Bus(options=serial_settings)
         self.__bus.on_packet_received = self.bus_packet_received
         self.__bus.on_packet_sent = self.bus_packet_sent
 
         # Create network connection(s)
-        for connection in self.__settings["connections"]:
+        for connection in network_settings:
             network = Network(options=connection)
             network.on_packet_received = self.tcp_packet_received
             self.__networks.append(network)
@@ -45,7 +43,7 @@ class Bridge():
         self.__tcp_buffer = {}
 
         # Create NTP
-        self.__ntp = Ntp()
+        self.__ntp = Ntp(options=ntp_settings)
         self.__ntp.on_packet_send_request = self.send
 
     def start(self) -> None:
@@ -57,7 +55,7 @@ class Bridge():
         for network in self.__networks:
             network.start()
 
-        if self.__settings["ntp"]["enabled"]:
+        if ntp_settings.enabled:
             self.__ntp.start()
 
     def send(self, packet: bytearray) -> None:
@@ -158,7 +156,7 @@ class Bridge():
             id (str): The id of the packet sent.
         """
 
-        client, packet = self.__tcp_buffer[id]
+        client, packet = self.__tcp_buffer[packet_id]
 
         # Relay to connected network clients
         for network in self.__networks:
@@ -167,7 +165,7 @@ class Bridge():
             if network.is_active() and network.relay():
                 network.send(packet, client)
 
-        del self.__tcp_buffer[id]
+        del self.__tcp_buffer[packet_id]
 
     def stop(self) -> None:
         """Stops NTP, bus and network.

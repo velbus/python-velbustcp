@@ -7,14 +7,14 @@ import time
 import logging
 
 from velbustcp.lib.packet.packetparser import PacketParser
-from velbustcp.settings import settings_dict
-
+from velbustcp.lib.settings.ntp import NtpSettings
+from velbustcp.lib.settings.settings import ntp_settings
 
 class Ntp():
 
     on_packet_send_request: Optional[Callable[[bytearray], None]]
 
-    def __init__(self):
+    def __init__(self, options: NtpSettings):
         """Initialises the NTP class.
         """
 
@@ -22,7 +22,7 @@ class Ntp():
 
         self.__is_active = False
         self.__sleep_event = threading.Event()
-        self.__settings = settings_dict["ntp"]
+        self.__settings = options
         self.__timezone = get_localzone()
 
     def start(self) -> None:
@@ -78,7 +78,7 @@ class Ntp():
                 until_dst = utc.localize(until_dst).astimezone(self.__timezone)
 
             # No synctime: one hour
-            if ("synctime" not in self.__settings) or ("synctime" in self.__settings and self.__settings["synctime"] == ""):
+            if not self.__settings.synctime:
                 until_synctime = now + timedelta(hours=1) - timedelta(minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
 
                 if until_synctime < until_dst:
@@ -90,7 +90,7 @@ class Ntp():
             else:
 
                 # Timesync
-                splitted = self.__settings["synctime"].split(":")
+                splitted = self.__settings.synctime.split(":")
                 hh = int(splitted[0])
                 mm = int(splitted[1])
 

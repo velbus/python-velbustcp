@@ -2,10 +2,18 @@ import threading
 import socket
 import ssl
 import logging
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+import sys
+from typing import Any, Dict, List, Optional
+
+if sys.version_info >= (3, 8):
+    from typing import Protocol
+else:
+    from typing_extensions import Protocol
 
 from velbustcp.lib.packet.packetexcluder import should_accept
 from velbustcp.lib.connection.client import Client
+from velbustcp.lib.connection.clientconnection import ClientConnection
+from velbustcp.lib.settings.network import NetworkSettings
 
 
 class OnNetworkPacketReceived(Protocol):
@@ -19,7 +27,7 @@ class Network():
 
     __clients: List[Client]
 
-    def __init__(self, options: Dict[str, Any]):
+    def __init__(self, options: NetworkSettings):
         """Initialises a TCP network.
 
         Args:
@@ -40,61 +48,7 @@ class Network():
             bool: Whether or not packets are relayed on this network.
         """
 
-        return bool(self.__options["relay"])
-
-    def host(self) -> str:
-        """Returns the host that this network is bound to.
-
-        Returns:
-            str: The host of the network.
-        """
-
-        return str(self.__options["host"])
-
-    def port(self) -> int:
-        """Returns the port that this network is bound to.
-
-        Returns:
-            int: The port of the network.
-        """
-
-        return int(self.__options["port"])
-
-    def address(self) -> Tuple[str, int]:
-        """Returns the address that this network is bound to.
-
-        Returns:
-            Tuple[str, int]: A tuple containing the host and port of the network.
-        """
-
-        return (self.host(), self.port())
-
-    def has_ssl(self) -> bool:
-        """Returns whether or not TLS/SSL is enabled for this Network.
-
-        Returns:
-            bool: Whether or not TLS/SSL is enabled.
-        """
-
-        return bool(self.__options["ssl"])
-
-    def has_auth(self) -> bool:
-        """Returns whether or not authentication is enabled for this Network.
-
-        Returns:
-            bool: Whether or not authentication is enabled.
-        """
-
-        return bool(self.__options["auth"])
-
-    def __auth_key(self) -> str:
-        """Returns the authentication key.
-
-        Returns:
-            str: A string containing the authentication key.
-        """
-
-        return str(self.__options["authkey"])
+        return self.__options.relay
 
     def send(self, data: bytearray, excluded_client: Optional[Client] = None) -> None:
         """Sends given data to all connected clients to the network. If excluded_client is supplied, will skip given excluded_client.
@@ -128,40 +82,39 @@ class Network():
         while self.is_active():
 
             try:
-                connection, address = self.__bind_socket.accept()
+                client_socket, address = self.__bind_socket.accept()
 
                 # Make sure that we're still active
                 if self.is_active():
 
-                    self.__logger.info("TCP connection from {0}".format(str(address)))
+                    self.__logger.info("TCP connection from %s", address)
 
-                    if self.has_ssl():
+                    if self.__options.ssl:
 
                         try:
-                            connection = self.__context.wrap_socket(connection, server_side=True)
+                            client_socket = self.__context.wrap_socket(client_socket, server_side=True)
 
                         except ssl.SSLError as e:
-                            self.__logger.error("Couldn't wrap socket")
+                            self.__logger.exception("Couldn't wrap socket")
                             raise e
 
+                    # Define client connection
+                    connection = ClientConnection()
+                    connection.socket = client_socket
+                    connection.should_authorize = self.__options.auth
+                    connection.authorization_key = self.__options.auth_key
+
+                    # Start client
                     client = Client(connection)
                     client.on_packet_receive = self.__on_packet_received
                     client.on_close = self.__on_client_close
-
-                    if self.has_auth():
-                        client.set_should_authorize(self.__auth_key())
-
                     client.start()
 
                     with self.__clients_lock:
                         self.__clients.append(client)
 
             except Exception as e:
-                self.__logger.error("Couldn't accept socket")
-                self.__logger.exception(str(e))
-
-        self.__bind_socket.close()
-        self.__logger.info("Closed TCP socket")
+                self.__logger.exception("Couldn't accept socket")
 
     def __on_packet_received(self, client: Client, packet: bytearray):
         """Called on Client packet receive.
@@ -185,10 +138,10 @@ class Network():
         """
 
         # Warning message
-        if self.__options["auth"] and not client.is_authorized():
-            self.__logger.info("TCP connection closed {0} [auth failed]".format(str(client.address())))
+        if not client.is_authorized():
+            self.__logger.info("TCP connection closed %s [auth failed]", client.address())
         else:
-            self.__logger.info("TCP connection closed {0}".format(str(client.address())))
+            self.__logger.info("TCP connection closed %s", client.address())
 
     def is_active(self) -> bool:
         """Returns whether or not the TCP connection is active
@@ -208,14 +161,14 @@ class Network():
 
         self.__bind_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__bind_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__bind_socket.bind(self.address())
+        self.__bind_socket.bind(self.__options.address)
         self.__bind_socket.listen(0)
 
-        if self.has_ssl():
+        if self.__options.ssl:
             self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             self.__context.load_cert_chain(self.__options["cert"], keyfile=self.__options["pk"])
 
-        self.__logger.info("Listening to TCP connections on {0}:{1} [SSL:{2}]".format(self.host(), self.port(), self.has_ssl()))
+        self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
 
         # Now that we reached here, set running
         self.__running = True
@@ -231,7 +184,7 @@ class Network():
 
         if self.is_active():
 
-            self.__logger.info("Stopping TCP connection {0}:{1}".format(self.host(), self.port()))
+            self.__logger.info("Stopping TCP connection %s", self.__options.address)
 
             # Set running to false
             self.__running = False
@@ -243,7 +196,12 @@ class Network():
 
             # Connect to itself to stop the blocking accept
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", self.port()))
+            s.connect(("127.0.0.1", self.__options.port))
 
             # Wait till the server thread is closed
             self.__server_thread.join()
+
+            # Close the socket
+            self.__bind_socket.close()
+
+            self.__logger.info("Stopped TCP connection %s", self.__options.address)

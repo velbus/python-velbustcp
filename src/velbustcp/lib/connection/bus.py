@@ -9,6 +9,7 @@ import logging
 
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib import consts
+from velbustcp.lib.settings.serial import SerialSettings
 
 SEND_DELAY = 0.05  # The minimum required time between consecutive bus writes, in seconds
 READ_DELAY = 0.01
@@ -86,7 +87,7 @@ class Bus():
     on_packet_sent: OnBusPacketSent
     on_packet_received: OnBusPacketReceived
 
-    def __init__(self, options: Dict[str, Any]):
+    def __init__(self, options: SerialSettings):
         """Initialises a bus connection.
 
         Args:
@@ -229,7 +230,7 @@ class Bus():
         self.__port = None
 
         # If we need to autodiscover port
-        if self.__options["autodiscover"]:
+        if self.__options.autodiscover:
 
             ports = self.__search_for_serial()
 
@@ -239,11 +240,11 @@ class Bus():
                 self.__port = ports[0]
 
             else:
-                self.__port = self.__options["port"]
+                self.__port = self.__options.port
 
         # No need to autodiscover, take given port
         else:
-            self.__port = self.__options["port"]
+            self.__port = self.__options.port
 
         if self.__port is None or self.__port == '':
             raise ValueError("Couldn't find a port to open communication on")

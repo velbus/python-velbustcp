@@ -5,7 +5,7 @@ import logging
 import logging.handlers
 
 from velbustcp.lib.connection.bridge import Bridge
-from velbustcp.settings import settings_dict, set_default_settings, validate_and_set_settings
+from velbustcp.lib.settings.settings import logging_settings, validate_and_set_settings
 
 
 class Main():
@@ -48,14 +48,14 @@ def setup_logging() -> logging.Logger:
 
     logger = logging.getLogger("velbustcp")
 
-    if settings_dict["logging"]["type"] == "debug":
+    if logging_settings.type == "debug":
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.INFO)
 
     handler: logging.Handler = logging.StreamHandler()
 
-    if settings_dict["logging"]["output"] == "syslog":
+    if logging_settings.output == "syslog":
         handler = logging.handlers.SysLogHandler()
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - %(message)s')
@@ -79,10 +79,6 @@ if __name__ == '__main__':
             settings = json.load(f)
 
         validate_and_set_settings(settings)
-
-    else:
-        # Set default settings
-        set_default_settings()
 
     # Setup logging
     logger = setup_logging()
