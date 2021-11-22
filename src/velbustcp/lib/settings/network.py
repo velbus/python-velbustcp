@@ -2,6 +2,7 @@ from __future__ import annotations
 import ipaddress
 import os
 from typing import Dict, Tuple
+from velbustcp.lib.util.util import str2bool
 
 
 class NetworkSettings():
@@ -27,12 +28,11 @@ class NetworkSettings():
         if "host" in settings_dict:
             settings.host = settings_dict["host"]
 
-            # Make sure host is empty (all), or a valid IPv4/IPv6
-            if settings.host:
-                ipaddress.ip_address(settings.host)
+            # Make sure host is valid
+            ipaddress.ip_address(settings.host)
 
         else:
-            settings.host = ""
+            settings.host = "0.0.0.0"
 
         # Port
         if "port" in settings_dict:
@@ -46,14 +46,14 @@ class NetworkSettings():
 
         # Relay
         if "relay" in settings_dict:
-            settings.relay = bool(settings_dict["relay"])
+            settings.relay = str2bool(settings_dict["relay"])
 
         else:
-            settings.relay = False
+            settings.relay = True
 
         # SSL
         if "ssl" in settings_dict:
-            ssl_enabled = bool(settings_dict["ssl"])
+            ssl_enabled = str2bool(settings_dict["ssl"])
 
             if ssl_enabled:
 

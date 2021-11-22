@@ -109,7 +109,7 @@ class Ntp():
 
             # Sleep until a minute before
             until = until - timedelta(minutes=1)
-            dt = until-now
+            dt = until - now
             self.__sleep_event.wait(dt.total_seconds())
 
     def __send_next_transition(self) -> None:

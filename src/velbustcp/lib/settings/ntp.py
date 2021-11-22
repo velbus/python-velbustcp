@@ -17,7 +17,11 @@ class NtpSettings():
         else:
             settings.enabled = False
 
-        if "synctime" in settings_dict and settings_dict["synctime"] != "":
+        if settings.enabled and not "synctime" not in settings_dict:
+
+            pass
+
+        if settings.enabled and not "synctime" not in settings_dict:
 
             # Validate sync time
             splitted = settings_dict["synctime"].split(":")
