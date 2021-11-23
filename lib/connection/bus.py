@@ -235,7 +235,7 @@ class Bus():
             bytesize    = serial.EIGHTBITS,
             xonxoff     = 0,
             timeout     = None,
-            dsrdtr      = 0,
+            dsrdtr      = 1,
             rtscts      = 0,
         )
 
