@@ -5,7 +5,7 @@ from typing import Dict
 class NtpSettings():
 
     enabled: bool = False
-    synctime: str = ""
+    synctime: str = "03:00"
 
     @staticmethod
     def parse(settings_dict: Dict) -> NtpSettings:  # type: ignore
@@ -14,14 +14,8 @@ class NtpSettings():
 
         if "enabled" in settings_dict:
             settings.enabled = bool(settings_dict["enabled"])
-        else:
-            settings.enabled = False
 
-        if settings.enabled and not "synctime" not in settings_dict:
-
-            pass
-
-        if settings.enabled and not "synctime" not in settings_dict:
+        if "synctime" in settings_dict:
 
             # Validate sync time
             splitted = settings_dict["synctime"].split(":")

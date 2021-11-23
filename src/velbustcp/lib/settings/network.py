@@ -31,9 +31,6 @@ class NetworkSettings():
             # Make sure host is valid
             ipaddress.ip_address(settings.host)
 
-        else:
-            settings.host = "0.0.0.0"
-
         # Port
         if "port" in settings_dict:
             settings.port = int(settings_dict["port"])
@@ -41,15 +38,9 @@ class NetworkSettings():
             if (settings.port < 0) or (settings.port > 65535):
                 raise ValueError("The provided port is invalid {0}".format(settings.port))
 
-        else:
-            settings.port = 27015
-
         # Relay
         if "relay" in settings_dict:
             settings.relay = str2bool(settings_dict["relay"])
-
-        else:
-            settings.relay = True
 
         # SSL
         if "ssl" in settings_dict:
@@ -70,9 +61,6 @@ class NetworkSettings():
 
             settings.ssl = ssl_enabled
 
-        else:
-            settings.ssl = False
-
         # Auth
         if "auth" in settings_dict:
             settings.auth = bool(settings_dict["auth"])
@@ -83,8 +71,5 @@ class NetworkSettings():
                     raise ValueError("No auth key provided or is empty")
 
                 settings.auth_key = settings_dict["auth_key"]
-
-        else:
-            settings.auth = False
 
         return settings

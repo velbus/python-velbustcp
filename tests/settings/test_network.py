@@ -21,10 +21,6 @@ def test_parse_host():
 
     settings_dict = dict()
 
-    # Default host
-    settings = NetworkSettings.parse(settings_dict)
-    assert settings.host == "0.0.0.0"
-
     # Valid host
     settings_dict["host"] = "127.0.0.1"
     settings = NetworkSettings.parse(settings_dict)
@@ -40,10 +36,6 @@ def test_parse_host():
 def test_parse_port():
 
     settings_dict = dict()
-
-    # Default port
-    settings = NetworkSettings.parse(settings_dict)
-    assert settings.port == 27015
 
     # Valid host
     settings_dict["port"] = "12345"
@@ -67,10 +59,6 @@ def test_parse_relay():
 
     settings_dict = dict()
 
-    # Default relay
-    settings = NetworkSettings.parse(settings_dict)
-    assert settings.relay
-
     # Valid relay
     settings_dict["relay"] = "false"
     settings = NetworkSettings.parse(settings_dict)
@@ -84,10 +72,6 @@ def test_parse_relay():
 def test_parse_ssl():
 
     settings_dict = dict()
-
-    # Default SSL
-    settings = NetworkSettings.parse(settings_dict)
-    assert not settings.ssl
 
     # Test SSL enabled, but no PK given
     settings_dict["ssl"] = "true"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Dict
+from velbustcp.lib.util.util import str2bool
 
 
 class SerialSettings():
@@ -17,6 +18,6 @@ class SerialSettings():
 
         # Autodiscover
         if "autodiscover" in settings_dict:
-            settings.autodiscover = bool(settings_dict["autodiscover"])
+            settings.autodiscover = str2bool(settings_dict["autodiscover"])
 
         return settings
