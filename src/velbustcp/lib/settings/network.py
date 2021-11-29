@@ -1,4 +1,3 @@
-from __future__ import annotations
 import ipaddress
 import os
 from typing import Dict, Tuple
@@ -21,7 +20,9 @@ class NetworkSettings():
         return (self.host, self.port)
 
     @staticmethod
-    def parse(settings_dict: Dict) -> NetworkSettings:  # type: ignore
+    def parse(settings_dict):
+        # type: (Dict[str, str]) -> NetworkSettings
+
         settings = NetworkSettings()
 
         # Host

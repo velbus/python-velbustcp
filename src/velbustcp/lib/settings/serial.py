@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Dict
 from velbustcp.lib.util.util import str2bool
 
@@ -9,7 +8,9 @@ class SerialSettings():
     autodiscover: bool = True
 
     @staticmethod
-    def parse(settings_dict: Dict) -> SerialSettings:   # type: ignore
+    def parse(settings_dict):
+        # type: (Dict[str, str]) -> SerialSettings
+
         settings = SerialSettings()
 
         # Port

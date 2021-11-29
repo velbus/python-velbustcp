@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Dict
 
 
@@ -8,7 +7,8 @@ class NtpSettings():
     synctime: str = "03:00"
 
     @staticmethod
-    def parse(settings_dict: Dict) -> NtpSettings:  # type: ignore
+    def parse(settings_dict):
+        # type: (Dict[str, str]) -> NtpSettings
 
         settings = NtpSettings()
 
