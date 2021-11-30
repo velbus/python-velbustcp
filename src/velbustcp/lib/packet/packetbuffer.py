@@ -37,9 +37,6 @@ class PacketBuffer:
         """
 
         if isinstance(key, slice):
-            print(key.start)
-            print(key.stop)
-            print(key.step)
             return bytearray(itertools.islice(self.buffer, key.start, key.stop - key.start, key.step))
 
         return int(self.buffer[key])
