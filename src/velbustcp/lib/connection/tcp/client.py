@@ -4,7 +4,7 @@ import socket
 import sys
 from typing import Any
 
-from velbustcp.lib.connection.clientconnection import ClientConnection
+from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
@@ -28,6 +28,7 @@ class Client():
 
     on_packet_receive: OnClientPacketReceived
     on_close: OnClientClose
+    __address: Any = ""
 
     def __init__(self, connection: ClientConnection):
         """Initialises a network client.
@@ -40,6 +41,7 @@ class Client():
         self.__connection = connection
         self.__authorized = False
         self.__is_active = False
+        self.__address = connection.socket.getpeername()
 
     def start(self) -> None:
         """Starts receiving data from the client.
@@ -100,7 +102,7 @@ class Client():
             Any: The address of the client.
         """
 
-        return self.__connection.socket.getpeername()
+        return self.__address
 
     def __bootstrap_client(self) -> None:
         """Bootstraps the client for communcation.

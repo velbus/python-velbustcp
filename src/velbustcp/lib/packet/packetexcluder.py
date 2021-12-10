@@ -1,4 +1,4 @@
-from velbustcp.lib.connection.client import Client
+from velbustcp.lib.connection.tcp.client import Client
 
 
 def should_accept(packet: bytearray, client: Client) -> bool:

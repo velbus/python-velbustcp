@@ -18,3 +18,8 @@ LENGTH_MASK = 0x0F
 HEADER_LENGTH = 4       # Header: [STX, priority, address, RTR+data length]
 MAX_DATA_AMOUNT = 8     # Maximum amount of data bytes in a packet
 MIN_PACKET_LENGTH = 6   # Smallest possible packet: [STX, priority, address, RTR+data length, CRC, ETC]
+
+# Serial
+SEND_DELAY = 0.05  # The minimum required time between consecutive bus writes, in seconds
+READ_DELAY = 0.01
+PRODUCT_IDS = ['VID:PID=10CF:0B1B', 'VID:PID=10CF:0516', 'VID:PID=10CF:0517', 'VID:PID=10CF:0518']

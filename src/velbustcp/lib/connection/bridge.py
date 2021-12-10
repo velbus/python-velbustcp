@@ -3,9 +3,9 @@ from typing import List, Optional
 import uuid
 
 from velbustcp.lib import consts
-from velbustcp.lib.connection.bus import Bus
-from velbustcp.lib.connection.network import Network
-from velbustcp.lib.connection.client import Client
+from velbustcp.lib.connection.serial.bus import Bus
+from velbustcp.lib.connection.tcp.network import Network
+from velbustcp.lib.connection.tcp.client import Client
 from velbustcp.lib.settings.settings import serial_settings, network_settings, ntp_settings
 from velbustcp.lib.ntp.ntp import Ntp
 
