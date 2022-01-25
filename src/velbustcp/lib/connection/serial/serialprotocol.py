@@ -1,6 +1,7 @@
 from typing import Protocol, Any
 import serial
 import logging
+from velbustcp.lib.packet.packetcache import packet_cache
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.connection.serial.events import OnBusPacketReceived, OnBusError, OnBusPacketSent
@@ -38,7 +39,8 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
             while packet:
 
                 if self.bus_packet_received:
-                    self.bus_packet_received(packet)
+                    packet_id = packet_cache.add(packet)
+                    self.bus_packet_received(packet_id)
 
                 packet = self.__parser.next()
 

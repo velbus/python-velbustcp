@@ -3,8 +3,10 @@ import threading
 import time
 from typing import Any, Deque, Tuple
 from velbustcp.lib import consts
-
+import logging
 from velbustcp.lib.connection.serial.serialprotocol import VelbusSerialProtocol
+from velbustcp.lib.packet.packetcache import packet_cache
+
 
 class WriterThread(threading.Thread):
 
@@ -12,14 +14,15 @@ class WriterThread(threading.Thread):
     protocol: VelbusSerialProtocol
 
     __send_event: threading.Event
-    __send_buffer: Deque[Tuple[bytearray, str]]
+    __send_buffer: Deque[str]
     __serial_lock: threading.Event
 
     def __init__(self, serial_instance, protocol_factory: VelbusSerialProtocol):
         self.serial = serial_instance
         self.protocol = protocol_factory
         self.__send_event = threading.Event()
-        self.__send_buffer = deque(maxlen=consts.MAX_BUFFER_LENGTH)
+        self.__send_buffer = deque()
+        self.__logger = logging.getLogger(__name__)
         self.__serial_lock = threading.Event()
         self.unlock()
         threading.Thread.__init__(self)
@@ -30,8 +33,8 @@ class WriterThread(threading.Thread):
         self.__send_event.set()
         self.join(2)
 
-    def queue(self, packet_id_tuple: Tuple[str, bytearray]):
-        self.__send_buffer.append(packet_id_tuple)
+    def queue(self, packet_id: str):
+        self.__send_buffer.append(packet_id)
         self.__send_event.set()
 
     def lock(self) -> None:
@@ -63,7 +66,8 @@ class WriterThread(threading.Thread):
                 if not self.is_alive() or not self.serial.is_open:
                     break
 
-                packet_id, packet = self.__send_buffer.popleft()
+                packet_id = self.__send_buffer.popleft()
+                packet = packet_cache.get(packet_id)
 
                 # Ensure that we don't write to the bus too fast
                 delta_time = time.monotonic() - last_send_time

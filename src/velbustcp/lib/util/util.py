@@ -1,6 +1,8 @@
 import logging
+import logging.handlers
 from typing import List
 import serial
+import serial.tools.list_ports
 from velbustcp.lib.settings.logging import LoggingSettings
 from velbustcp.lib.consts import PRODUCT_IDS
 

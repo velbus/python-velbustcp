@@ -2,30 +2,19 @@ import threading
 import socket
 import ssl
 import logging
-import sys
 from typing import List, Optional
-
-if sys.version_info >= (3, 8):
-    from typing import Protocol
-else:
-    from typing_extensions import Protocol
-
+from velbustcp.lib.connection.tcp.events import OnNetworkPacketReceived
 from velbustcp.lib.packet.packetexcluder import should_accept
 from velbustcp.lib.connection.tcp.client import Client
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.settings.network import NetworkSettings
 
 
-class OnNetworkPacketReceived(Protocol):
-    def __call__(self, client: Client, packet: bytearray) -> None:
-        pass
-
-
 class Network():
 
-    on_packet_received: OnNetworkPacketReceived
-
     __clients: List[Client]
+
+    on_packet_received: OnNetworkPacketReceived
 
     def __init__(self, options: NetworkSettings):
         """Initialises a TCP network.

@@ -4,9 +4,8 @@ import serial.threaded
 import serial.tools.list_ports
 import threading
 import logging
-from velbustcp.lib.util.util import search_for_serial
 from velbustcp.lib.settings.serial import SerialSettings
-from velbustcp.lib.connection.serial.factory import construct_serial_obj
+from velbustcp.lib.connection.serial.factory import construct_serial_obj, find_port
 from velbustcp.lib.connection.serial.events import OnBusPacketReceived, OnBusPacketSent
 from velbustcp.lib.connection.serial.serialprotocol import VelbusSerialProtocol
 from velbustcp.lib.connection.serial.writerthread import WriterThread
@@ -88,7 +87,11 @@ class Bus():
         if self.is_active():
             return
 
-        self.__port = self.__find_port()
+        self.__port = find_port(options=self.__options)
+
+        if not self.__port:
+            raise ValueError("Couldn't find a port to open communication on")
+
         self.__serial_port = construct_serial_obj(self.__port)
 
         if not self.__serial_port.isOpen():
@@ -126,14 +129,14 @@ class Bus():
             if self._writer.is_alive():
                 self._writer.stop()
 
-    def send(self, id_packet_tuple: Tuple[str, bytearray]) -> None:
+    def send(self, packet_id: str) -> None:
         """Queues a packet to be sent on the serial connection.
 
         Args:
-            id_packet_tuple (Tuple[str, bytearray]): A tuple containing a request ID (str) and data (bytearray)
+            packet_id (str): An id
         """
 
-        self._writer.queue(id_packet_tuple)
+        self._writer.queue(packet_id)
 
     def lock(self) -> None:
         """Locks the bus, disabling writes to the bus.
@@ -146,32 +149,6 @@ class Bus():
         """
 
         self._writer.unlock()
-
-    def __find_port(self) -> str:
-
-        port = None
-
-        # If we need to autodiscover port
-        if self.__options.autodiscover:
-
-            ports = search_for_serial()
-
-            if len(ports) > 0:
-                self.__logger.info("Autodiscovered %d port(s): %s", len(ports), ports)
-                self.__logger.info("Choosing %s", ports[0])
-                port = ports[0]
-
-            else:
-                port = self.__options.port
-
-        # No need to autodiscover, take given port
-        else:
-            port = self.__options.port
-
-        if not port:
-            raise ValueError("Couldn't find a port to open communication on")
-
-        return port
 
     def __on_packet_received(self, packet: bytearray) -> None:
         """Called when a packet is received from the bus. Propagates it to its callback.

@@ -1,8 +1,13 @@
-from typing import Protocol
+import sys
+
+if sys.version_info >= (3, 8):
+    from typing import Protocol
+else:
+    from typing_extensions import Protocol
 
 
 class OnBusPacketReceived(Protocol):
-    def __call__(self, packet: bytearray) -> None:
+    def __call__(self, packet_id: str) -> None:
         pass
 
 class OnBusPacketSent(Protocol):
