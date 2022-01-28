@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional, Tuple
+import logging
+from typing import Dict, List
 from velbustcp.lib import consts
 from velbustcp.lib.connection.tcp.client import Client
-from velbustcp.lib.connection.tcp.events import OnNetworkManagerPacketReceived, OnNetworkPacketReceived
+from velbustcp.lib.connection.tcp.events import OnNetworkManagerPacketReceived
 from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.packet.packetcache import packet_cache
 from velbustcp.lib.settings.network import NetworkSettings
@@ -9,16 +10,18 @@ from velbustcp.lib.settings.network import NetworkSettings
 
 class NetworkManager:
 
+    __logger: logging.Logger
     __networks: List[Network] = []
-    
+
     # Buffer to track received TCP packets
     __tcp_buffer: Dict[str, Client] = {}
-    
+
     on_packet_received: OnNetworkManagerPacketReceived
 
     def __init__(self, connections: List[NetworkSettings]) -> None:
 
         self.__tcp_buffer = {}
+        self.__logger = logging.getLogger("__main__." + __name__)
 
         for connection in connections:
             network = Network(options=connection)
@@ -52,12 +55,12 @@ class NetworkManager:
             if network.is_active() and network.relay():
                 network.send(packet, excluded_client)
 
-    def __packet_received(self, client: Client, data: bytearray):
-        """Queues a packet to be sent on the bus.
+    def __packet_received(self, client: Client, packet: bytearray):
+        """Called upon receiving a packet from a Network.
 
         Args:
+            client (Client): Client which sent the packet.
             packet (bytearray): Packet received from the client.
-            client (Client, optional): Client which sent the packet. Defaults to None.
         """
 
         # Do we not yet have exceeded the max buffer length?
@@ -66,7 +69,7 @@ class NetworkManager:
             return
 
         # Add to cache
-        packet_id = packet_cache.add(data)
+        packet_id = packet_cache.add(packet)
 
         # Add to dict
         self.__tcp_buffer[packet_id] = client
@@ -74,4 +77,4 @@ class NetworkManager:
         self.__logger.debug(f"Added request {packet_id} to buffer.")
 
         if self.on_packet_received:
-            self.on_packet_received(packet_id, data)
+            self.on_packet_received(packet_id)

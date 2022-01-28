@@ -1,8 +1,7 @@
-from typing import Protocol, Any
+from typing import Any
 import serial
 import logging
 from velbustcp.lib.packet.packetcache import packet_cache
-from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.connection.serial.events import OnBusPacketReceived, OnBusError, OnBusPacketSent
 
@@ -16,7 +15,7 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     on_error: OnBusError
 
     def __init__(self):
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
         self.__parser = PacketParser()
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:

@@ -8,19 +8,21 @@ from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
-else:
+else:  # pragma: no cover
     from typing_extensions import Protocol
 
 from velbustcp.lib.packet.packetparser import PacketParser
 
 
 class OnClientPacketReceived(Protocol):
-    def __call__(self, client: Any, packet: bytearray) -> None:
+    def __call__(self, client, packet):
+        # type: (Client, bytearray) -> None
         pass
 
 
 class OnClientClose(Protocol):
-    def __call__(self, client: Any) -> None:
+    def __call__(self, client):
+        # type: (Client) -> None
         pass
 
 
@@ -37,7 +39,7 @@ class Client():
             connection (ClientConnection): The ClientConnection for the client.
         """
 
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
         self.__connection = connection
         self.__authorized = False
         self.__is_active = False

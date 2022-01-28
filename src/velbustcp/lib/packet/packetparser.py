@@ -15,7 +15,7 @@ class PacketParser:
         """
 
         self.buffer: PacketBuffer = PacketBuffer()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("__main__." + __name__)
 
     def __has_valid_header_waiting(self) -> bool:
         """Checks whether or not the parser has a valid packet header waiting.

@@ -20,6 +20,7 @@ def set_serial_settings(s: serial.Serial):
     s.dsrdtr = 1
     s.rtscts = 0
 
+
 def construct_serial_obj(port: str) -> serial.Serial:
     """Constructs a serial object for use with the Velbus protocol.
 
@@ -35,22 +36,22 @@ def construct_serial_obj(port: str) -> serial.Serial:
 
     return s
 
-def find_port(options: SerialSettings) -> str:
 
-    port = None
+def find_port(options: SerialSettings) -> str:
+    """[summary]
+
+    Args:
+        options (SerialSettings): [description]
+
+    Returns:
+        str: A port name
+    """
 
     # If we need to autodiscover port
     if options.autodiscover:
-
         ports = search_for_serial()
 
-        if len(ports) > 0:
-            self.__logger.info("Autodiscovered %d port(s): %s", len(ports), ports)
-            self.__logger.info("Choosing %s", ports[0])
-            port = ports[0]
+        return next((port for port in ports), options.port)
 
     # No port found (or no autodiscover)
-    if not port:
-        port = options.port
-
-    return port
+    return options.port

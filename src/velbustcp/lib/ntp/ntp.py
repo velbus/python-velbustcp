@@ -18,7 +18,7 @@ class Ntp():
         """Initialises the NTP class.
         """
 
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
 
         self.__is_active = False
         self.__sleep_event = threading.Event()

@@ -23,7 +23,7 @@ class Bridge():
         """
 
         # Logger
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
 
         # Create bus
         self.__bus = Bus(options=serial_settings)
@@ -66,7 +66,7 @@ class Bridge():
         """
 
         packet = packet_cache.get(packet_id)
-        
+
         self.__logger.debug("[BUS IN] " + " ".join(hex(x) for x in packet))
 
         self.__bus_status.receive_packet(packet)

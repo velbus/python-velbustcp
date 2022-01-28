@@ -8,6 +8,7 @@ class LoggingSettings():
 
     type: str = "info"
     output: str = "stream"
+    name: str = "__main__"
 
     @staticmethod
     def parse(settings_dict):

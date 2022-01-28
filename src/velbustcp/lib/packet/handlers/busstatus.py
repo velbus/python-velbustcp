@@ -8,7 +8,7 @@ class BusStatus():
     __buffer_ready: bool = False
 
     def __init__(self):
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
 
     @property
     def alive(self):

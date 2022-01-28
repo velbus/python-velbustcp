@@ -1,8 +1,6 @@
 import argparse
 import json
 from threading import Event
-import logging
-import logging.handlers
 
 from velbustcp.lib.connection.bridge import Bridge
 from velbustcp.lib.settings.settings import logging_settings, validate_and_set_settings
@@ -18,9 +16,6 @@ class Main():
     def __init__(self):
         """Initialises the main class.
         """
-
-        # Logger
-        self.__logger = logging.getLogger(__name__)
 
         # Bridge
         self.__bridge = Bridge()
@@ -38,6 +33,7 @@ class Main():
         """
 
         self.__bridge.stop()
+
 
 if __name__ == '__main__':
 
@@ -67,7 +63,7 @@ if __name__ == '__main__':
         logger.info("Interrupted, shutting down")
 
     except Exception as e:
-        logger.exception(str(e))
+        logger.exception(e)
 
     finally:
         main.stop()

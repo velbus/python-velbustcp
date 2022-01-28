@@ -1,4 +1,3 @@
-from typing import  Deque, List, Tuple
 import serial
 import serial.threaded
 import serial.tools.list_ports
@@ -28,7 +27,7 @@ class Bus():
             options (dict): The options used to configure the serial connection.
         """
 
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
         self.__reconnect_event = threading.Event()
         self.__options = options
 
@@ -55,7 +54,8 @@ class Bus():
         while self.__do_reconnect and not self.is_active():
             try:
                 self.__start()
-            except Exception as e:
+            # TODO: specify exception type
+            except Exception:
                 self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
                 self.__reconnect_event.clear()
                 self.__reconnect_event.wait(5)
@@ -150,7 +150,7 @@ class Bus():
 
         self._writer.unlock()
 
-    def __on_packet_received(self, packet: bytearray) -> None:
+    def __on_packet_received(self, packet_id: str) -> None:
         """Called when a packet is received from the bus. Propagates it to its callback.
 
         Args:
@@ -158,7 +158,7 @@ class Bus():
         """
 
         if self.on_packet_received:
-            self.on_packet_received(packet)
+            self.on_packet_received(packet_id)
 
     def __on_packet_sent(self, packet_id: str) -> None:
         """Called when a packet is sent to the bus. Propagates it to its callback.

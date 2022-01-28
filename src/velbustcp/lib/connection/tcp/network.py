@@ -23,7 +23,7 @@ class Network():
             options (dict): The options used to configure the network.
         """
 
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
 
         self.__clients = []
         self.__clients_lock = threading.Lock()

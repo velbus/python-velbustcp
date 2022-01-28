@@ -1,7 +1,7 @@
 from collections import deque
 import threading
 import time
-from typing import Any, Deque, Tuple
+from typing import Any, Deque
 from velbustcp.lib import consts
 import logging
 from velbustcp.lib.connection.serial.serialprotocol import VelbusSerialProtocol
@@ -22,7 +22,7 @@ class WriterThread(threading.Thread):
         self.protocol = protocol_factory
         self.__send_event = threading.Event()
         self.__send_buffer = deque()
-        self.__logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger("__main__." + __name__)
         self.__serial_lock = threading.Event()
         self.unlock()
         threading.Thread.__init__(self)
@@ -86,6 +86,6 @@ class WriterThread(threading.Thread):
 
                 except Exception as e:
                     self.__logger.exception(e)
-                    self.__on_error()
+                    # self.__on_error()
 
                 last_send_time = time.monotonic()

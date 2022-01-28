@@ -15,7 +15,7 @@ class PacketBuffer:
         """
 
         self.buffer: Deque[int] = collections.deque(maxlen=10000)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("__main__." + __name__)
 
     def __len__(self) -> int:
         """Return the number of items in the buffer.
