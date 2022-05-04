@@ -45,7 +45,7 @@ class Network():
             assert isinstance(excluded_client, Client)
 
         self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
-        
+
         with self.__clients_lock:
             for client in self.__clients:
 
@@ -53,7 +53,7 @@ class Network():
                     continue
 
                 try:
-                    client.send(data)                       
+                    client.send(data)
                 except Exception:
                     self.__logger.exception("Could not send data to client %s", client.address())
 

@@ -1,6 +1,5 @@
 import logging
 from velbustcp.lib.connection.serial.bus import Bus
-from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 from velbustcp.lib.packet.handlers.busstatus import BusStatus
 from velbustcp.lib.packet.packetcache import packet_cache

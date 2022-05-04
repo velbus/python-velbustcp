@@ -2,7 +2,7 @@ import logging
 import threading
 import socket
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 
@@ -106,8 +106,8 @@ class Client():
             self.__logger.warn("Client authorization failed for %s", self.address())
             self.stop()
             return
-            
-        # Handle packets    
+
+        # Handle packets
         self.__handle_packets()
 
         # Make sure client communication is stopped
@@ -119,7 +119,6 @@ class Client():
         Returns:
             bool: Whether or not the client is successfully authenticated.
         """
-        
 
         if not self.__connection.should_authorize:
             return True
@@ -147,7 +146,7 @@ class Client():
         # Receive data
         while self.is_active():
 
-            data: bytes = None
+            data: Optional[bytes] = None
 
             try:
                 data = self.__connection.socket.recv(1024)
