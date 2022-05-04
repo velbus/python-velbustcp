@@ -3,7 +3,10 @@ import json
 from threading import Event
 
 from velbustcp.lib.connection.bridge import Bridge
-from velbustcp.lib.settings.settings import logging_settings, validate_and_set_settings
+from velbustcp.lib.connection.serial.bus import Bus
+from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
+from velbustcp.lib.ntp.ntp import Ntp
+from velbustcp.lib.settings.settings import serial_settings, network_settings, ntp_settings, logging_settings, validate_and_set_settings
 from velbustcp.lib.util.util import setup_logging
 
 
@@ -18,7 +21,11 @@ class Main():
         """
 
         # Bridge
-        self.__bridge = Bridge()
+        bus = Bus(options=serial_settings)
+        network_manager = NetworkManager(connections=network_settings)
+        ntp = Ntp(options=ntp_settings)
+
+        self.__bridge = Bridge(bus, network_manager, ntp)
         self.__bridge.start()
 
     def main_loop(self):

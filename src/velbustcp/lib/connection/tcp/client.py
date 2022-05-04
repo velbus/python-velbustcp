@@ -30,7 +30,6 @@ class Client():
 
     on_packet_receive: OnClientPacketReceived
     on_close: OnClientClose
-    __address: Any = ""
 
     def __init__(self, connection: ClientConnection):
         """Initialises a network client.
@@ -39,11 +38,10 @@ class Client():
             connection (ClientConnection): The ClientConnection for the client.
         """
 
-        self.__logger = logging.getLogger("__main__." + __name__)
-        self.__connection = connection
-        self.__authorized = False
-        self.__is_active = False
-        self.__address = connection.socket.getpeername()
+        self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
+        self.__connection: ClientConnection = connection
+        self.__is_active: bool = False
+        self.__address: Any = connection.socket.getpeername()
 
     def start(self) -> None:
         """Starts receiving data from the client.
@@ -51,7 +49,9 @@ class Client():
 
         # Start a thread to handle receive
         if not self.is_active():
-            self._receive_thread = threading.Thread(target=self.__bootstrap_client)
+            self.__is_active = True
+            self.__logger.info("Starting client connection for %s", self.address())
+            self._receive_thread = threading.Thread(target=self.__handle_client)
             self._receive_thread.name = f"TCP-RECV: {self.address()}"
             self._receive_thread.start()
 
@@ -60,8 +60,8 @@ class Client():
         """
 
         if self.is_active():
-            self.__logger.info(f"Closing connection for {self.address()}")
             self.__is_active = False
+            self.__logger.info("Closing client connection for %s", self.address())
             self.__connection.socket.shutdown(socket.SHUT_RDWR)
             self.__connection.socket.close()
 
@@ -78,15 +78,6 @@ class Client():
         if self.is_active():
             self.__connection.socket.sendall(data)
 
-    def is_authorized(self) -> bool:
-        """Returns whether or not the client is authorized to send messages to the server.
-
-        Returns:
-            bool: Whether or not the client is authorized to send messages to the server.
-        """
-
-        return self.__authorized
-
     def is_active(self) -> bool:
         """Returns whether the client is active for communication.
         If applicable, this also means that the client is authenticated.
@@ -95,7 +86,7 @@ class Client():
             bool: Whether the client is active for communication.
         """
 
-        return self.is_authorized() and self.__is_active
+        return self.__is_active
 
     def address(self) -> Any:
         """Returns the address of the client.
@@ -106,41 +97,46 @@ class Client():
 
         return self.__address
 
-    def __bootstrap_client(self) -> None:
+    def __handle_client(self) -> None:
         """Bootstraps the client for communcation.
         """
 
-        # Set the client active
-        self.__is_active = True
-
-        # Handle authorization
-        self.__handle_authorization()
-
-        # If authorized, start handling packets
-        if self.is_authorized():
-            self.__handle_packets()
+        # Handle authorization, if not authorized stop client and return
+        if not self.__handle_authorization():
+            self.__logger.warn("Client authorization failed for %s", self.address())
+            self.stop()
+            return
+            
+        # Handle packets    
+        self.__handle_packets()
 
         # Make sure client communication is stopped
         self.stop()
 
-    def __handle_authorization(self) -> None:
+    def __handle_authorization(self) -> bool:
         """Handles client authorization.
+
+        Returns:
+            bool: Whether or not the client is successfully authenticated.
         """
+        
 
         if not self.__connection.should_authorize:
-            self.__authorized = True
-            return
+            return True
 
         try:
             data = self.__connection.socket.recv(1024)
 
             if not data:
-                raise Exception("Client disconnected before receiving authorization key")
+                self.__logger.warn("Client %s disconnected before receiving authorization key", self.address())
+                return False
 
-            self.__authorized = self.__connection.authorization_key == data.decode("utf-8").strip()
+            return self.__connection.authorization_key == data.decode("utf-8").strip()
 
         except Exception:
-            self.__logger.warn(f"Authorization failed for {self.address()}")
+            self.__logger.exception("Exception during authorization for %s", self.address())
+
+        return False
 
     def __handle_packets(self) -> None:
         """Receives packet until client is no longer active.
@@ -151,23 +147,23 @@ class Client():
         # Receive data
         while self.is_active():
 
+            data: bytes = None
+
             try:
                 data = self.__connection.socket.recv(1024)
-
-                # If no data received from the socket, the client disconnected
-                # Break out of the loop
-                if not data:
-                    break
-
-                parser.feed(bytearray(data))
-                packet = parser.next()
-                while packet is not None:
-
-                    if self.on_packet_receive:
-                        self.on_packet_receive(self, packet)
-
-                    packet = parser.next()
-
-            # If an exception is thrown, log it
             except Exception:
                 self.__logger.exception("Exception during packet receiving")
+
+            # If no data received from the socket, the client disconnected
+            # Break out of the loop
+            if not data:
+                break
+
+            parser.feed(bytearray(data))
+            packet = parser.next()
+            while packet is not None:
+
+                if self.on_packet_receive:
+                    self.on_packet_receive(self, packet)
+
+                packet = parser.next()

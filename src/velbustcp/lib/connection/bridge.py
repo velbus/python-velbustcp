@@ -1,9 +1,9 @@
 import logging
 from velbustcp.lib.connection.serial.bus import Bus
+from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 from velbustcp.lib.packet.handlers.busstatus import BusStatus
 from velbustcp.lib.packet.packetcache import packet_cache
-from velbustcp.lib.settings.settings import serial_settings, network_settings, ntp_settings
 from velbustcp.lib.ntp.ntp import Ntp
 
 
@@ -13,29 +13,26 @@ class Bridge():
     Connects serial and TCP connection(s) together.
     """
 
-    __bus_status: BusStatus
-    __bus: Bus
-    __network_manager: NetworkManager
-    __ntp: Ntp
-
-    def __init__(self):
+    def __init__(self, bus: Bus, network_manager: NetworkManager, ntp: Ntp):
         """Initialises the Bridge class.
         """
 
         # Logger
-        self.__logger = logging.getLogger("__main__." + __name__)
+        self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
 
         # Create bus
-        self.__bus = Bus(options=serial_settings)
-        self.__bus.on_packet_received = self.bus_packet_received
-        self.__bus.on_packet_sent = self.bus_packet_sent
+        self.__bus: Bus = bus
+        self.__bus.on_packet_received = self.__bus_packet_received
+        self.__bus.on_packet_sent = self.__bus_packet_sent
+
+        self.__bus_status: BusStatus = BusStatus()
 
         # Create network manager
-        self.__network_manager = NetworkManager(connections=network_settings)
+        self.__network_manager: NetworkManager = network_manager
         self.__network_manager.on_packet_received = self.tcp_packet_received
 
         # Create NTP
-        self.__ntp = Ntp(options=ntp_settings)
+        self.__ntp: Ntp = ntp
         self.__ntp.on_packet_send_request = self.send
 
     def start(self) -> None:
@@ -44,9 +41,7 @@ class Bridge():
 
         self.__bus.ensure()
         self.__network_manager.start()
-
-        if ntp_settings.enabled:
-            self.__ntp.start()
+        self.__ntp.start()
 
     def send(self, packet: bytearray) -> None:
         """Sends a packet that has been received internally (e.g. NTP).
@@ -58,7 +53,7 @@ class Bridge():
         packet_id = packet_cache.add(packet)
         self.__bus.send(packet_id)
 
-    def bus_packet_received(self, packet_id: str) -> None:
+    def __bus_packet_received(self, packet_id: str) -> None:
         """Called when the serial connection receives a packet.
 
         Args:
@@ -71,18 +66,18 @@ class Bridge():
 
         self.__bus_status.receive_packet(packet)
 
-        if self.__bus_status.alive:
+        if not self.__bus_status.alive:
             self.__bus.lock()
         else:
             self.__bus.unlock()
 
         self.__network_manager.send(packet_id)
 
-    def bus_packet_sent(self, packet_id: str) -> None:
-        """[summary]
+    def __bus_packet_sent(self, packet_id: str) -> None:
+        """Called when the bus has sent a packet.
 
         Args:
-            packet_id (str): [description]
+            packet_id (str): The id of the sent packet.
         """
 
         self.__network_manager.send(packet_id)

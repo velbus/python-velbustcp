@@ -48,12 +48,9 @@ class NetworkManager:
 
         packet = packet_cache.get(packet_id)
 
-        # Relay to connected network clients
+        # Send to networks
         for network in self.__networks:
-
-            # Send to everyone except the one we received it from
-            if network.is_active() and network.relay():
-                network.send(packet, excluded_client)
+            network.send(packet, excluded_client)
 
     def __packet_received(self, client: Client, packet: bytearray):
         """Called upon receiving a packet from a Network.

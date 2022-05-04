@@ -12,8 +12,6 @@ from velbustcp.lib.settings.network import NetworkSettings
 
 class Network():
 
-    __clients: List[Client]
-
     on_packet_received: OnNetworkPacketReceived
 
     def __init__(self, options: NetworkSettings):
@@ -23,21 +21,11 @@ class Network():
             options (dict): The options used to configure the network.
         """
 
-        self.__logger = logging.getLogger("__main__." + __name__)
-
-        self.__clients = []
-        self.__clients_lock = threading.Lock()
-        self.__running = False
-        self.__options = options
-
-    def relay(self) -> bool:
-        """Returns whether or not packets are relayed on this network.
-
-        Returns:
-            bool: Whether or not packets are relayed on this network.
-        """
-
-        return self.__options.relay
+        self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
+        self.__clients: List[Client] = []
+        self.__clients_lock: threading.Lock = threading.Lock()
+        self.__running: bool = False
+        self.__options: NetworkSettings = options
 
     def send(self, data: bytearray, excluded_client: Optional[Client] = None) -> None:
         """Sends given data to all connected clients to the network. If excluded_client is supplied, will skip given excluded_client.
@@ -47,22 +35,27 @@ class Network():
             excluded_client (Client, optional): Specifies which client to skip sending the data to. Defaults to None.
         """
 
+        if not self.is_active():
+            return
+
+        if not self.__options.relay:
+            return
+
         if excluded_client:
             assert isinstance(excluded_client, Client)
 
-        self.__logger.debug("[TCP OUT] " + " ".join(hex(x) for x in data))
+        self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
+        
+        with self.__clients_lock:
+            for client in self.__clients:
 
-        if self.is_active():
-            with self.__clients_lock:
-                for client in self.__clients:
+                if (client == excluded_client) or not should_accept(data, client):
+                    continue
 
-                    if client.is_active():
-
-                        try:
-                            if (client != excluded_client) and should_accept(data, client):
-                                client.send(data)
-                        except Exception:
-                            continue
+                try:
+                    client.send(data)                       
+                except Exception:
+                    self.__logger.exception("Could not send data to client %s", client.address())
 
     def __accept_sockets(self) -> None:
         """Accepts clients from socket, if the tcp server is closed it will also close socket
@@ -74,33 +67,28 @@ class Network():
                 client_socket, address = self.__bind_socket.accept()
 
                 # Make sure that we're still active
-                if self.is_active():
+                if not self.is_active():
+                    return
 
-                    self.__logger.info("TCP connection from %s", address)
+                self.__logger.info("TCP connection from %s", address)
 
-                    if self.__options.ssl:
+                if self.__options.ssl:
+                    client_socket = self.__context.wrap_socket(client_socket, server_side=True)
 
-                        try:
-                            client_socket = self.__context.wrap_socket(client_socket, server_side=True)
+                # Define client connection
+                connection = ClientConnection()
+                connection.socket = client_socket
+                connection.should_authorize = self.__options.auth
+                connection.authorization_key = self.__options.auth_key
 
-                        except ssl.SSLError as e:
-                            self.__logger.exception("Couldn't wrap socket")
-                            raise e
+                # Start client
+                client = Client(connection)
+                client.on_packet_receive = self.__on_packet_received
+                client.on_close = self.__on_client_close
+                client.start()
 
-                    # Define client connection
-                    connection = ClientConnection()
-                    connection.socket = client_socket
-                    connection.should_authorize = self.__options.auth
-                    connection.authorization_key = self.__options.auth_key
-
-                    # Start client
-                    client = Client(connection)
-                    client.on_packet_receive = self.__on_packet_received
-                    client.on_close = self.__on_client_close
-                    client.start()
-
-                    with self.__clients_lock:
-                        self.__clients.append(client)
+                with self.__clients_lock:
+                    self.__clients.append(client)
 
             except Exception:
                 self.__logger.exception("Couldn't accept socket")
@@ -113,11 +101,9 @@ class Network():
             packet (bytearray): The packet that is received.
         """
 
-        # Make sure we should accept the packet
-        if should_accept(packet, client):
-
-            if self.on_packet_received:
-                self.on_packet_received(client, packet)
+        # Check if handler is attached and we should accept the packet
+        if self.on_packet_received and should_accept(packet, client):
+            self.on_packet_received(client, packet)
 
     def __on_client_close(self, client: Client):
         """Called on Client tcp connection close.
@@ -126,11 +112,10 @@ class Network():
             client (Client): The client for which the connection closed.
         """
 
-        # Warning message
-        if not client.is_authorized():
-            self.__logger.info("TCP connection closed %s [auth failed]", client.address())
-        else:
-            self.__logger.info("TCP connection closed %s", client.address())
+        self.__logger.info("TCP connection closed %s", client.address())
+
+        with self.__clients_lock:
+            self.__clients.remove(client)
 
     def is_active(self) -> bool:
         """Returns whether or not the TCP connection is active
@@ -164,7 +149,7 @@ class Network():
 
         # Start the server thread to handle connections
         self.__server_thread = threading.Thread(target=self.__accept_sockets)
-        self.__server_thread.name = 'TCP server thread'
+        self.__server_thread.name = "TCP server thread " + self.__options.host + ":" + str(self.__options.port)
         self.__server_thread.start()
 
     def stop(self) -> None:

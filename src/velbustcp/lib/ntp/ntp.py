@@ -1,4 +1,10 @@
-from typing import Callable, Optional
+import sys
+
+if sys.version_info >= (3, 8):
+    from typing import Protocol
+else:  # pragma: no cover
+    from typing_extensions import Protocol
+
 from pytz import utc
 from tzlocal import get_localzone
 from datetime import datetime, timedelta
@@ -10,9 +16,14 @@ from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.settings.ntp import NtpSettings
 
 
+class OnPacketSendRequest(Protocol):
+    def __call__(self, packet: bytearray) -> None:
+        pass
+
+
 class Ntp():
 
-    on_packet_send_request: Optional[Callable[[bytearray], None]]
+    on_packet_send_request: OnPacketSendRequest
 
     def __init__(self, options: NtpSettings):
         """Initialises the NTP class.
@@ -20,6 +31,7 @@ class Ntp():
 
         self.__logger = logging.getLogger("__main__." + __name__)
 
+        self.__options = options
         self.__is_active = False
         self.__sleep_event = threading.Event()
         self.__settings = options
@@ -29,8 +41,9 @@ class Ntp():
         """Periodically broadcasts the time on the bus.
         """
 
-        self.__thread = threading.Thread(target=self.__do_ntp)
-        self.__thread.start()
+        if self.__options.enabled and not self.is_active():
+            self.__thread = threading.Thread(target=self.__do_ntp)
+            self.__thread.start()
 
     def is_active(self) -> bool:
         """Returns whether or not NTP is active.

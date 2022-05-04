@@ -13,17 +13,17 @@ class WriterThread(threading.Thread):
     serial: Any
     protocol: VelbusSerialProtocol
 
-    __send_event: threading.Event
-    __send_buffer: Deque[str]
-    __serial_lock: threading.Event
+    __send_event: threading.Event = threading.Event()
+    __send_buffer: Deque[str] = deque()
+    __serial_lock: threading.Event = threading.Event()
 
     def __init__(self, serial_instance, protocol_factory: VelbusSerialProtocol):
+
+        self.__logger = logging.getLogger("__main__." + __name__)
+
         self.serial = serial_instance
         self.protocol = protocol_factory
-        self.__send_event = threading.Event()
-        self.__send_buffer = deque()
-        self.__logger = logging.getLogger("__main__." + __name__)
-        self.__serial_lock = threading.Event()
+
         self.unlock()
         threading.Thread.__init__(self)
 
