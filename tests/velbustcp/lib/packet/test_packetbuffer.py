@@ -15,7 +15,7 @@ def test_realign(data, expected_result):
     parser = PacketBuffer()
     parser.feed(data)
     parser.realign()
-    assert len(parser.buffer) == expected_result
+    assert len(parser) == expected_result
 
 
 indexing_data = [

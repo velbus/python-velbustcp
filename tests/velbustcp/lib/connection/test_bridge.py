@@ -108,12 +108,6 @@ def test_bus_packet_sent(mocker: MockerFixture):
 
 def test_network_packet_receive(mocker: MockerFixture):
 
-    def not_active():
-        return False
-
-    def active():
-        return True
-
     mock_bus = mocker.Mock()
     mock_network_manager = mocker.Mock()
     mock_ntp = mocker.Mock()
@@ -123,12 +117,6 @@ def test_network_packet_receive(mocker: MockerFixture):
     # Add a packet to the cache
     packet_id = packet_cache.add(bytearray([]))
 
-    # Check on network receive but bus not active
-    mock_bus.is_active = not_active
-    mock_network_manager.on_packet_received(packet_id)
-    mock_bus.send.assert_not_called()
-
-    # Check on network receive and bus is active
-    mock_bus.is_active = active
+    # Check on network receive it is propagated to the bus
     mock_network_manager.on_packet_received(packet_id)
     mock_bus.send.assert_called_with(packet_id)

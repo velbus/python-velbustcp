@@ -44,7 +44,8 @@ class Network():
         if excluded_client:
             assert isinstance(excluded_client, Client)
 
-        self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
 
         with self.__clients_lock:
             for client in self.__clients:

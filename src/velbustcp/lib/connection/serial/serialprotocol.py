@@ -29,7 +29,6 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         """
 
         if data:
-            self.__logger.debug(bytearray(data))
             self.__parser.feed(bytearray(data))
 
             # Try to get new packets in the parser

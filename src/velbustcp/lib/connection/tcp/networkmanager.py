@@ -71,7 +71,8 @@ class NetworkManager:
         # Add to dict
         self.__tcp_buffer[packet_id] = client
 
-        self.__logger.debug(f"Added request {packet_id} to buffer.")
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug("Added request %s to buffer", packet_id)
 
         if self.on_packet_received:
             self.on_packet_received(packet_id)

@@ -61,7 +61,8 @@ class Bridge():
 
         packet = packet_cache.get(packet_id)
 
-        self.__logger.debug("[BUS IN] " + " ".join(hex(x) for x in packet))
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug("[BUS IN] %s",  " ".join(hex(x) for x in packet))
 
         self.__bus_status.receive_packet(packet)
 
@@ -88,11 +89,11 @@ class Bridge():
             packet_id (str): The id of the packet.
         """
 
-        packet = packet_cache.get(packet_id)
-        self.__logger.debug("[TCP IN] " + " ".join(hex(x) for x in packet))
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            packet = packet_cache.get(packet_id)
+            self.__logger.debug("[TCP IN] %s", " ".join(hex(x) for x in packet))
 
-        if self.__bus.is_active():
-            self.__bus.send(packet_id)
+        self.__bus.send(packet_id)
 
     def stop(self) -> None:
         """Stops NTP, bus and network.

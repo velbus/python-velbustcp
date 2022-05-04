@@ -14,8 +14,8 @@ class PacketBuffer:
         """Initialises the packet buffer.
         """
 
-        self.buffer: Deque[int] = collections.deque(maxlen=10000)
-        self.logger = logging.getLogger("__main__." + __name__)
+        self.__buffer: Deque[int] = collections.deque(maxlen=10000)
+        self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
 
     def __len__(self) -> int:
         """Return the number of items in the buffer.
@@ -24,7 +24,7 @@ class PacketBuffer:
             int: The number of items in the buffer.
         """
 
-        return len(self.buffer)
+        return len(self.__buffer)
 
     def __getitem__(self, key) -> Union[bytearray, int]:
         """[summary]
@@ -37,9 +37,9 @@ class PacketBuffer:
         """
 
         if isinstance(key, slice):
-            return bytearray(itertools.islice(self.buffer, key.start, key.stop - key.start, key.step))
+            return bytearray(itertools.islice(self.__buffer, key.start, key.stop - key.start, key.step))
 
-        return int(self.buffer[key])
+        return int(self.__buffer[key])
 
     def realign(self) -> None:
         """Realigns buffer by shifting the queue until the next STX or until the buffer runs out.
@@ -47,12 +47,16 @@ class PacketBuffer:
 
         amount = 1
 
-        while (amount < len(self.buffer)) and (self.buffer[amount] != STX):
+        while (amount < len(self.__buffer)) and (self.__buffer[amount] != STX):
             amount += 1
 
-        self.logger.debug(f"Realigning |:{list(self.buffer)}:|")
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug(f"Realigning |:{list(self.__buffer)}:|")
+
         self.shift(amount)
-        self.logger.debug(f"Realigned  |:{list(self.buffer)}:|")
+
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug(f"Realigned  |:{list(self.__buffer)}:|")
 
     def shift(self, amount: int) -> None:
         """Shifts the buffer by the specified amount.
@@ -62,7 +66,7 @@ class PacketBuffer:
         """
 
         for _ in itertools.repeat(None, amount):
-            self.buffer.popleft()
+            self.__buffer.popleft()
 
     def feed(self, data: bytearray) -> None:
         """Feed data into the parser to be processed.
@@ -71,4 +75,4 @@ class PacketBuffer:
             array (bytearray): The data that will be added to the parser.
         """
 
-        self.buffer.extend(data)
+        self.__buffer.extend(data)
