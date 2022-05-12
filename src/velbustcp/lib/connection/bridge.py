@@ -61,7 +61,7 @@ class Bridge():
 
         packet = packet_cache.get(packet_id)
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
+        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug("[BUS IN] %s",  " ".join(hex(x) for x in packet))
 
         self.__bus_status.receive_packet(packet)
@@ -89,7 +89,7 @@ class Bridge():
             packet_id (str): The id of the packet.
         """
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
+        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             packet = packet_cache.get(packet_id)
             self.__logger.debug("[TCP IN] %s", " ".join(hex(x) for x in packet))
 

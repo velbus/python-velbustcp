@@ -1,3 +1,4 @@
+from typing import Optional
 import serial
 import serial.threaded
 import serial.tools.list_ports
@@ -12,13 +13,8 @@ from velbustcp.lib.connection.serial.writerthread import WriterThread
 
 class Bus():
 
-    __do_reconnect = False
-    __connected = False
-    __in_error: bool = False
-    __protocol: VelbusSerialProtocol
-
-    on_packet_sent: OnBusPacketSent
-    on_packet_received: OnBusPacketReceived
+    on_packet_sent: Optional[OnBusPacketSent] = None
+    on_packet_received: Optional[OnBusPacketReceived] = None
 
     def __init__(self, options: SerialSettings):
         """Initialises a bus connection.
@@ -31,7 +27,11 @@ class Bus():
         self.__reconnect_event = threading.Event()
         self.__options = options
 
-        self.__protocol = VelbusSerialProtocol()
+        self.__do_reconnect: bool = False
+        self.__connected: bool = False
+        self.__in_error: bool = False
+
+        self.__protocol: VelbusSerialProtocol = VelbusSerialProtocol()
         self.__protocol.bus_packet_sent = self.__on_packet_sent
         self.__protocol.bus_packet_received = self.__on_packet_received
         self.__protocol.on_error = self.__on_error

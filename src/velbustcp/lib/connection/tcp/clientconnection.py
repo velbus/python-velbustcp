@@ -6,5 +6,5 @@ class ClientConnection():
     """
 
     socket: socket.socket
-    should_authorize: bool
-    authorization_key: str
+    should_authorize: bool = False
+    authorization_key: str = ""

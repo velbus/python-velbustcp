@@ -50,12 +50,12 @@ class PacketBuffer:
         while (amount < len(self.__buffer)) and (self.__buffer[amount] != STX):
             amount += 1
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
+        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug(f"Realigning |:{list(self.__buffer)}:|")
 
         self.shift(amount)
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
+        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug(f"Realigned  |:{list(self.__buffer)}:|")
 
     def shift(self, amount: int) -> None:

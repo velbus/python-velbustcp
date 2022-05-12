@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 8):  # pragma: no cover
     from typing import Protocol
 else:  # pragma: no cover
     from typing_extensions import Protocol
@@ -17,19 +17,19 @@ from velbustcp.lib.packet.packetparser import PacketParser
 class OnClientPacketReceived(Protocol):
     def __call__(self, client, packet):
         # type: (Client, bytearray) -> None
-        pass
+        pass  # pragma: no cover
 
 
 class OnClientClose(Protocol):
     def __call__(self, client):
         # type: (Client) -> None
-        pass
+        pass  # pragma: no cover
 
 
 class Client():
 
-    on_packet_receive: OnClientPacketReceived
-    on_close: OnClientClose
+    on_packet_receive: Optional[OnClientPacketReceived] = None
+    on_close: Optional[OnClientClose] = None
 
     def __init__(self, connection: ClientConnection):
         """Initialises a network client.
@@ -41,7 +41,7 @@ class Client():
         self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
         self.__connection: ClientConnection = connection
         self.__is_active: bool = False
-        self.__address: Any = connection.socket.getpeername()
+        self.__address: str = connection.socket.getpeername()
 
     def start(self) -> None:
         """Starts receiving data from the client.
@@ -51,9 +51,9 @@ class Client():
         if not self.is_active():
             self.__is_active = True
             self.__logger.info("Starting client connection for %s", self.address())
-            self._receive_thread = threading.Thread(target=self.__handle_client)
-            self._receive_thread.name = f"TCP-RECV: {self.address()}"
-            self._receive_thread.start()
+            self.__receive_thread = threading.Thread(target=self.__handle_client)
+            self.__receive_thread.name = f"TCP-RECV: {self.address()}"
+            self.__receive_thread.start()
 
     def stop(self) -> None:
         """Stops receiving data and disconnects from the client.
@@ -103,7 +103,7 @@ class Client():
 
         # Handle authorization, if not authorized stop client and return
         if not self.__handle_authorization():
-            self.__logger.warn("Client authorization failed for %s", self.address())
+            self.__logger.warning("Client authorization failed for %s", self.address())
             self.stop()
             return
 
@@ -127,7 +127,7 @@ class Client():
             data = self.__connection.socket.recv(1024)
 
             if not data:
-                self.__logger.warn("Client %s disconnected before receiving authorization key", self.address())
+                self.__logger.warning("Client %s disconnected before receiving authorization key", self.address())
                 return False
 
             return self.__connection.authorization_key == data.decode("utf-8").strip()
@@ -152,14 +152,17 @@ class Client():
                 data = self.__connection.socket.recv(1024)
             except Exception:
                 self.__logger.exception("Exception during packet receiving")
+                return
 
             # If no data received from the socket, the client disconnected
             # Break out of the loop
             if not data:
-                break
+                self.__logger.info("Received no data from client %s", self.address())
+                return
 
             parser.feed(bytearray(data))
             packet = parser.next()
+
             while packet is not None:
 
                 if self.on_packet_receive:

@@ -1,32 +1,24 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from velbustcp.lib import consts
 from velbustcp.lib.connection.tcp.client import Client
 from velbustcp.lib.connection.tcp.events import OnNetworkManagerPacketReceived
 from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.packet.packetcache import packet_cache
-from velbustcp.lib.settings.network import NetworkSettings
 
 
 class NetworkManager:
 
-    __logger: logging.Logger
-    __networks: List[Network] = []
+    on_packet_received: Optional[OnNetworkManagerPacketReceived] = None
 
-    # Buffer to track received TCP packets
-    __tcp_buffer: Dict[str, Client] = {}
+    def __init__(self) -> None:
+        self.__tcp_buffer: Dict[str, Client] = {}
+        self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
+        self.__networks: List[Network] = []
 
-    on_packet_received: OnNetworkManagerPacketReceived
-
-    def __init__(self, connections: List[NetworkSettings]) -> None:
-
-        self.__tcp_buffer = {}
-        self.__logger = logging.getLogger("__main__." + __name__)
-
-        for connection in connections:
-            network = Network(options=connection)
-            network.on_packet_received = self.__packet_received
-            self.__networks.append(network)
+    def add_network(self, network: Network):
+        network.on_packet_received = self.__packet_received
+        self.__networks.append(network)
 
     def start(self):
 
@@ -62,7 +54,7 @@ class NetworkManager:
 
         # Do we not yet have exceeded the max buffer length?
         if len(self.__tcp_buffer) == consts.MAX_BUFFER_LENGTH:
-            self.__logger.warn("Buffer full on TCP receive.")
+            self.__logger.warning("Buffer full on TCP receive.")
             return
 
         # Add to cache
@@ -71,7 +63,7 @@ class NetworkManager:
         # Add to dict
         self.__tcp_buffer[packet_id] = client
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
+        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug("Added request %s to buffer", packet_id)
 
         if self.on_packet_received:

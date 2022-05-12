@@ -12,7 +12,7 @@ from velbustcp.lib.settings.network import NetworkSettings
 
 class Network():
 
-    on_packet_received: OnNetworkPacketReceived
+    on_packet_received: Optional[OnNetworkPacketReceived] = None
 
     def __init__(self, options: NetworkSettings):
         """Initialises a TCP network.
@@ -44,7 +44,7 @@ class Network():
         if excluded_client:
             assert isinstance(excluded_client, Client)
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
+        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
 
         with self.__clients_lock:

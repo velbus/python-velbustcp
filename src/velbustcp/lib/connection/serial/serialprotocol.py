@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 import serial
 import logging
 from velbustcp.lib.packet.packetcache import packet_cache
@@ -10,9 +10,9 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
     """Velbus serial protocol.
     """
 
-    bus_packet_received: OnBusPacketReceived
-    bus_packet_sent: OnBusPacketSent
-    on_error: OnBusError
+    bus_packet_received: Optional[OnBusPacketReceived] = None
+    bus_packet_sent: Optional[OnBusPacketSent] = None
+    on_error: Optional[OnBusError] = None
 
     def __init__(self):
         self.__logger = logging.getLogger("__main__." + __name__)
