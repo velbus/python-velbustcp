@@ -84,17 +84,17 @@ class Ntp():
 
             now = utc.localize(datetime.utcnow()).astimezone(self.__timezone)
 
-            # DST
-            until_dst = now + timedelta(days=1)
-            if hasattr(self.__timezone, "_utc_transition_times"):
-                until_dst = next(time for time in self.__timezone._utc_transition_times if time > datetime.utcnow())    # type: ignore
-                until_dst = utc.localize(until_dst).astimezone(self.__timezone)
-
+            # DST - if the timezone has it
+            until_dst = None
+            if hasattr(self.__timezone, '_utc_transition_times'):
+                until_dst = next(time for time in self.__timezone._utc_transition_times if time > datetime.utcnow())
+                until_dst = utc.localize(until_dst).astimezone(self.__timezone)            
+            
             # No synctime: one hour
             if not self.__settings.synctime:
                 until_synctime = now + timedelta(hours=1) - timedelta(minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
 
-                if until_synctime < until_dst:
+                if not until_dst or until_synctime < until_dst:
                     until = until_synctime
                 else:
                     until = until_dst
