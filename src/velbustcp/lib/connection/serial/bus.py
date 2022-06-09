@@ -54,9 +54,8 @@ class Bus():
         while self.__do_reconnect and not self.is_active():
             try:
                 self.__start()
-            # TODO: specify exception type
             except Exception:
-                self.__logger.error("Couldn't create bus connection, waiting 5 seconds")
+                self.__logger.exception("Couldn't create bus connection, waiting 5 seconds")
                 self.__reconnect_event.clear()
                 self.__reconnect_event.wait(5)
 
@@ -102,12 +101,12 @@ class Bus():
         self.__in_error = False
 
         # Create reader thread
-        self._reader = serial.threaded.ReaderThread(self.__serial_port, self.__protocol)
-        self._reader.start()
+        self.__reader = serial.threaded.ReaderThread(self.__serial_port, self.__protocol)
+        self.__reader.start()
 
         # Create write thread
-        self._writer = WriterThread(self.__serial_port, self.__protocol)
-        self._writer.start()
+        self.__writer = WriterThread(self.__serial_port, self.__protocol)
+        self.__writer.start()
 
         self.__logger.info("Serial connection active on port %s", self.__port)
 
@@ -124,10 +123,10 @@ class Bus():
             self.__connected = False
 
             if not self.__in_error:
-                self._reader.close()
+                self.__reader.close()
 
-            if self._writer.is_alive():
-                self._writer.stop()
+            if self.__writer.is_alive():
+                self.__writer.stop()
 
     def send(self, packet_id: str) -> None:
         """Queues a packet to be sent on the serial connection.
@@ -136,19 +135,19 @@ class Bus():
             packet_id (str): An id
         """
 
-        self._writer.queue(packet_id)
+        self.__writer.queue(packet_id)
 
     def lock(self) -> None:
         """Locks the bus, disabling writes to the bus.
         """
 
-        self._writer.lock()
+        self.__writer.lock()
 
     def unlock(self) -> None:
         """Unlocks the bus, allowing writes to the bus.
         """
 
-        self._writer.unlock()
+        self.__writer.unlock()
 
     def __on_packet_received(self, packet_id: str) -> None:
         """Called when a packet is received from the bus. Propagates it to its callback.

@@ -1,8 +1,9 @@
-flake8==3.9.2
-tox==3.24.3
-pytest==6.2.5
-pytest-cov==2.12.1
-pytest-mock==3.6.1
-mypy==0.910
-typing-extensions==4.0.0
-lxml==4.7.1
+ # requirements_dev.txt
+ #
+ # installs dev dependencies from ./setup.py, and the package itself,
+ # in editable mode
+ -e .
+
+ # (the -e above is optional). you could also just install the package
+ # normally with just the line below (after uncommenting)
+ # .

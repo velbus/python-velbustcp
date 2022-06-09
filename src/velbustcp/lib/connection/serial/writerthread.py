@@ -10,9 +10,6 @@ from velbustcp.lib.packet.packetcache import packet_cache
 
 class WriterThread(threading.Thread):
 
-    serial: Any
-    protocol: VelbusSerialProtocol
-
     def __init__(self, serial_instance, protocol_factory: VelbusSerialProtocol):
 
         self.__logger = logging.getLogger("__main__." + __name__)
@@ -20,8 +17,8 @@ class WriterThread(threading.Thread):
         self.__send_buffer: Deque[str] = deque()
         self.__serial_lock: threading.Event = threading.Event()
 
-        self.serial = serial_instance
-        self.protocol = protocol_factory
+        self.__serial: Any = serial_instance
+        self.__protocol: VelbusSerialProtocol = protocol_factory
 
         self.unlock()
         threading.Thread.__init__(self)
@@ -54,7 +51,7 @@ class WriterThread(threading.Thread):
 
         last_send_time = time.monotonic()
 
-        while self.is_alive() and self.serial.is_open:
+        while self.is_alive() and self.__serial.is_open:
             self.__send_event.wait()
             self.__send_event.clear()
 
@@ -62,7 +59,7 @@ class WriterThread(threading.Thread):
             while len(self.__send_buffer) > 0:
 
                 # Still connected?
-                if not self.is_alive() or not self.serial.is_open:
+                if not self.is_alive() or not self.__serial.is_open:
                     break
 
                 packet_id = self.__send_buffer.popleft()
@@ -78,10 +75,10 @@ class WriterThread(threading.Thread):
 
                 # Write packet and set new last send time
                 try:
-                    self.serial.write(packet)
+                    self.__serial.write(packet)
 
-                    if self.protocol.bus_packet_sent:
-                        self.protocol.bus_packet_sent(packet_id)
+                    if self.__protocol.bus_packet_sent:
+                        self.__protocol.bus_packet_sent(packet_id)
 
                 except Exception as e:
                     self.__logger.exception(e)

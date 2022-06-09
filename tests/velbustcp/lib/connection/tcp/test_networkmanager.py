@@ -17,7 +17,7 @@ def test_add_network(mocker: MockFixture):
     network_manager.add_network(network)
 
     # Assert
-    assert network.on_packet_received  # TODO
+    assert network.on_packet_received
 
 
 def test_start(mocker: MockFixture):
