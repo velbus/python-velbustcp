@@ -147,13 +147,12 @@ class PacketParser:
         Returns:
             bytearray: Will return a bytearray if there is a packet present, None if there is no packet available.
         """
-
         packet = None
 
         # Check if we have a valid packet until we don't have anything left in buffer
         has_valid_packet = self.__has_valid_packet_waiting()
 
-        while (not has_valid_packet) and self.__has_header_length():
+        while (not has_valid_packet) and self.__has_valid_header_waiting() and self.__has_packet_length_waiting():
             self.buffer.realign()
             has_valid_packet = self.__has_valid_packet_waiting()
 

@@ -20,6 +20,8 @@ def setup_logging(settings: LoggingSettings) -> logging.Logger:
 
     logger = logging.getLogger(settings.name)
 
+    print(settings.type)
+
     # Set type
     if settings.type == "debug":
         logger.setLevel(logging.DEBUG)

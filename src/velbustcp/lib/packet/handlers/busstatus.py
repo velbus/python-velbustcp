@@ -1,13 +1,21 @@
 import logging
 from velbustcp.lib import consts
-
+from velbustcp.lib.signals import on_bus_receive
 
 class BusStatus():
 
-    __active: bool = False
-    __buffer_ready: bool = False
+    __active: bool = True
+    __buffer_ready: bool = True
 
     def __init__(self):
+
+        # Hook up signal
+        def handle_packet_receive(sender, **kwargs):
+            packet: bytearray = kwargs["packet"]
+            self.receive_packet(packet)
+        self.handle_packet_receive = handle_packet_receive
+        on_bus_receive.connect(handle_packet_receive)
+
         self.__logger = logging.getLogger("__main__." + __name__)
 
     @property

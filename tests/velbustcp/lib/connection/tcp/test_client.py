@@ -2,6 +2,7 @@ import threading
 from velbustcp.lib.connection.tcp.client import Client
 from pytest_mock import MockFixture, MockerFixture
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
+from velbustcp.lib.signals import on_client_close, on_tcp_receive
 
 
 def get_mock_socket(mocker: MockerFixture):
@@ -46,11 +47,11 @@ def test_auth_wrong_key(mocker: MockerFixture):
     # Create client
     e = threading.Event()
 
-    def on_close(client):
+    def handle_client_close(sender, **kwargs):
         e.set()
+    on_client_close.connect(handle_client_close)   
 
     client = Client(conn)
-    client.on_close = on_close
     client.start()
 
     e.wait()
@@ -72,11 +73,11 @@ def test_auth_no_data(mocker: MockerFixture):
     # Create client
     e = threading.Event()
 
-    def on_close(client):
+    def handle_client_close(sender, **kwargs):
         e.set()
+    on_client_close.connect(handle_client_close)   
 
     client = Client(conn)
-    client.on_close = on_close
     client.start()
 
     e.wait()
@@ -98,11 +99,11 @@ def test_auth_recv_exception(mocker: MockerFixture):
     # Create client
     e = threading.Event()
 
-    def on_close(client):
+    def handle_client_close(sender, **kwargs):
         e.set()
+    on_client_close.connect(handle_client_close)   
 
     client = Client(conn)
-    client.on_close = on_close
     client.start()
 
     e.wait()
@@ -122,12 +123,11 @@ def test_packet_empty(mocker: MockFixture):
 
     # Create client
     e = threading.Event()
-
-    def on_close(client):
+    def handle_client_close(sender, **kwargs):
         e.set()
+    on_client_close.connect(handle_client_close)   
 
     client = Client(conn)
-    client.on_close = on_close
     client.start()
 
     e.wait()
@@ -150,13 +150,15 @@ def test_packet_handling(mocker: MockFixture):
     # Create client
     e = threading.Event()
 
-    def on_packet_receive(client, packet):
+    def on_packet_receive(sender, **kwargs):
+        packet = kwargs["packet"]
         if (packet == bytearray(data)):
             e.set()
 
     client = Client(conn)
-    client.on_packet_receive = on_packet_receive
     client.start()
+
+    on_tcp_receive.connect(on_packet_receive)
 
     e.wait()
 
@@ -178,11 +180,11 @@ def test_packet_recv_exception(mocker: MockerFixture):
     # Create client
     e = threading.Event()
 
-    def on_close(client):
+    def handle_client_close(sender, **kwargs):
         e.set()
+    on_client_close.connect(handle_client_close)   
 
     client = Client(conn)
-    client.on_close = on_close
     client.start()
 
     e.wait()
@@ -190,6 +192,32 @@ def test_packet_recv_exception(mocker: MockerFixture):
 
 
 def test_client_send(mocker: MockerFixture):
+
+    # Create connection
+    data = bytes([0x0F, 0xFB, 0xFF, 0x40, 0xB7, 0x04])
+
+    def recv(len):
+        return [0x00]
+
+    conn = ClientConnection()
+    conn.socket = get_mock_socket(mocker)
+    conn.socket.recv = recv
+    conn.should_authorize = False
+
+    # Create client
+    client = Client(conn)
+
+    # First send data without client being connected
+    client.send(data)
+    conn.socket.sendall.assert_not_called()
+
+    # Start client and try sending
+    client.start()
+    client.send(bytearray(data))
+    conn.socket.sendall.assert_called_with(data)
+    client.stop()
+
+def test_client_send_not_own_packet(mocker: MockerFixture):
 
     # Create connection
     data = bytes([0x0F, 0xFB, 0xFF, 0x40, 0xB7, 0x04])
@@ -205,12 +233,9 @@ def test_client_send(mocker: MockerFixture):
     # Create client
     client = Client(conn)
 
-    # First send data without client being connected
-    client.send(data)
-    conn.socket.sendall.assert_not_called()
-
-    # Start client and retry sending
+    # Start client and try sending
+    # should fail because it originated from that client
     client.start()
-    client.send(data)
-    conn.socket.sendall.assert_called_with(data)
+    client.send(bytearray(data))
+    conn.socket.sendall.assert_not_called()
     client.stop()

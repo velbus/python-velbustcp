@@ -1,48 +1,49 @@
 from collections import deque
+from serial import Serial
 import threading
 import time
-from typing import Any, Deque
-from velbustcp.lib import consts
+from typing import Deque
 import logging
-from velbustcp.lib.connection.serial.serialprotocol import VelbusSerialProtocol
-from velbustcp.lib.packet.packetcache import packet_cache
+
+from velbustcp.lib import consts
+from velbustcp.lib.signals import on_bus_send
 
 
 class WriterThread(threading.Thread):
 
-    def __init__(self, serial_instance, protocol_factory: VelbusSerialProtocol):
-
+    def __init__(self, serial_instance: Serial):
+        self.alive: bool = True
+        self.__serial: Serial = serial_instance        
         self.__logger = logging.getLogger("__main__." + __name__)
         self.__send_event: threading.Event = threading.Event()
         self.__send_buffer: Deque[str] = deque()
         self.__serial_lock: threading.Event = threading.Event()
+        self.unlock()       
 
-        self.__serial: Any = serial_instance
-        self.__protocol: VelbusSerialProtocol = protocol_factory
-
-        self.unlock()
         threading.Thread.__init__(self)
 
-    def stop(self):
+    def close(self):
         """Stop the reader thread"""
+
+        if not self.alive:
+            return
+
         self.alive = False
         self.__send_event.set()
         self.join(2)
 
-    def queue(self, packet_id: str):
-        self.__send_buffer.append(packet_id)
+    def queue(self, packet: bytearray):
+        self.__send_buffer.append(packet)
         self.__send_event.set()
 
     def lock(self) -> None:
         """Locks the write thread.
         """
-
         self.__serial_lock.clear()
 
     def unlock(self) -> None:
         """Unlocks the write thread.
         """
-
         self.__serial_lock.set()
 
     def run(self) -> None:
@@ -51,7 +52,7 @@ class WriterThread(threading.Thread):
 
         last_send_time = time.monotonic()
 
-        while self.is_alive() and self.__serial.is_open:
+        while self.alive and self.__serial.is_open:
             self.__send_event.wait()
             self.__send_event.clear()
 
@@ -59,11 +60,10 @@ class WriterThread(threading.Thread):
             while len(self.__send_buffer) > 0:
 
                 # Still connected?
-                if not self.is_alive() or not self.__serial.is_open:
-                    break
+                if not self.alive or not self.__serial.is_open:
+                    return
 
-                packet_id = self.__send_buffer.popleft()
-                packet = packet_cache.get(packet_id)
+                packet = self.__send_buffer.popleft()
 
                 # Ensure that we don't write to the bus too fast
                 delta_time = time.monotonic() - last_send_time
@@ -71,14 +71,23 @@ class WriterThread(threading.Thread):
                     time.sleep(consts.SEND_DELAY - delta_time)
 
                 # Wait for serial lock to be not set
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.debug("Wait serial lock")
+
                 self.__serial_lock.wait()
+
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.debug("After wait serial lock")
 
                 # Write packet and set new last send time
                 try:
-                    self.__serial.write(packet)
+                    if self.__logger.isEnabledFor(logging.DEBUG):
+                        self.__logger.debug("[BUS OUT] %s",  " ".join(hex(x) for x in packet))
 
-                    if self.__protocol.bus_packet_sent:
-                        self.__protocol.bus_packet_sent(packet_id)
+                    self.__serial.write(packet)
+                    on_bus_send.send(self, packet=packet)
+                    
+                    self.__logger.debug("Sent packet")
 
                 except Exception as e:
                     self.__logger.exception(e)

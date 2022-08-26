@@ -1,18 +1,13 @@
-from typing import Any, Optional
+from typing import Any
 import serial
 import logging
-from velbustcp.lib.packet.packetcache import packet_cache
-from velbustcp.lib.packet.packetparser import PacketParser
-from velbustcp.lib.connection.serial.events import OnBusPacketReceived, OnBusError, OnBusPacketSent
 
+from velbustcp.lib.packet.packetparser import PacketParser
+from velbustcp.lib.signals import on_bus_receive, on_bus_fault
 
 class VelbusSerialProtocol(serial.threaded.Protocol):
     """Velbus serial protocol.
     """
-
-    bus_packet_received: Optional[OnBusPacketReceived] = None
-    bus_packet_sent: Optional[OnBusPacketSent] = None
-    on_error: Optional[OnBusError] = None
 
     def __init__(self):
         self.__logger = logging.getLogger("__main__." + __name__)
@@ -36,10 +31,10 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
 
             while packet:
 
-                if self.bus_packet_received:
-                    packet_id = packet_cache.add(packet)
-                    self.bus_packet_received(packet_id)
+                if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
+                    self.__logger.debug("[BUS IN] %s",  " ".join(hex(x) for x in packet))
 
+                on_bus_receive.send(self, packet=packet)
                 packet = self.__parser.next()
 
     def connection_lost(self, exc: Exception):
@@ -48,5 +43,4 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         if exc:
             self.__logger.exception(exc)
 
-        if self.on_error:
-            self.on_error()
+        on_bus_fault.send(self)

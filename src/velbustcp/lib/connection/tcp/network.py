@@ -2,17 +2,14 @@ import threading
 import socket
 import ssl
 import logging
-from typing import List, Optional
-from velbustcp.lib.connection.tcp.events import OnNetworkPacketReceived
-from velbustcp.lib.packet.packetexcluder import should_accept
+from typing import List
 from velbustcp.lib.connection.tcp.client import Client
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.settings.network import NetworkSettings
+from velbustcp.lib.signals import on_client_close
 
 
 class Network():
-
-    on_packet_received: Optional[OnNetworkPacketReceived] = None
 
     def __init__(self, options: NetworkSettings):
         """Initialises a TCP network.
@@ -21,18 +18,29 @@ class Network():
             options (dict): The options used to configure the network.
         """
 
+        # Hook up signal
+        def handle_client_close(sender: Client, **kwargs):
+            self.__logger.info("TCP connection closed %s", sender.address())
+
+            if sender not in self.__clients:
+                return
+            
+            with self.__clients_lock:
+                self.__clients.remove(sender)
+        self.handle_client_close = handle_client_close
+        on_client_close.connect(handle_client_close)
+
         self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
         self.__clients: List[Client] = []
         self.__clients_lock: threading.Lock = threading.Lock()
         self.__running: bool = False
         self.__options: NetworkSettings = options
 
-    def send(self, data: bytearray, excluded_client: Optional[Client] = None) -> None:
-        """Sends given data to all connected clients to the network. If excluded_client is supplied, will skip given excluded_client.
+    def send(self, data: bytearray) -> None:
+        """Sends given data to all connected clients to the network.
 
         Args:
-            data (bytearray): Specifies what data to send to the connected clients
-            excluded_client (Client, optional): Specifies which client to skip sending the data to. Defaults to None.
+            data (bytearray): Specifies the packet to send to the connected clients of this network.
         """
 
         if not self.is_active():
@@ -41,18 +49,11 @@ class Network():
         if not self.__options.relay:
             return
 
-        if excluded_client:
-            assert isinstance(excluded_client, Client)
-
         if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
 
         with self.__clients_lock:
             for client in self.__clients:
-
-                if (client == excluded_client) or not should_accept(data, client):
-                    continue
-
                 try:
                     client.send(data)
                 except Exception:
@@ -84,8 +85,6 @@ class Network():
 
                 # Start client
                 client = Client(connection)
-                client.on_packet_receive = self.__on_packet_received
-                client.on_close = self.__on_client_close
                 client.start()
 
                 with self.__clients_lock:
@@ -93,30 +92,6 @@ class Network():
 
             except Exception:
                 self.__logger.exception("Couldn't accept socket")
-
-    def __on_packet_received(self, client: Client, packet: bytearray):
-        """Called on Client packet receive.
-
-        Args:
-            client (Client): The client which received the packet.
-            packet (bytearray): The packet that is received.
-        """
-
-        # Check if handler is attached and we should accept the packet
-        if self.on_packet_received and should_accept(packet, client):
-            self.on_packet_received(client, packet)
-
-    def __on_client_close(self, client: Client):
-        """Called on Client tcp connection close.
-
-        Args:
-            client (Client): The client for which the connection closed.
-        """
-
-        self.__logger.info("TCP connection closed %s", client.address())
-
-        with self.__clients_lock:
-            self.__clients.remove(client)
 
     def is_active(self) -> bool:
         """Returns whether or not the TCP connection is active
@@ -153,30 +128,32 @@ class Network():
         self.__server_thread.name = "TCP server thread " + self.__options.host + ":" + str(self.__options.port)
         self.__server_thread.start()
 
+
     def stop(self) -> None:
         """Stops the TCP server
         """
 
-        if self.is_active():
+        if not self.is_active():
+            return
 
-            self.__logger.info("Stopping TCP connection %s", self.__options.address)
+        self.__logger.info("Stopping TCP connection %s", self.__options.address)
 
-            # Set running to false
-            self.__running = False
+        # Set running to false
+        self.__running = False
 
-            # Stop every client listening
-            with self.__clients_lock:
-                for client in self.__clients:
-                    client.stop()
+        # Stop every client listening
+        with self.__clients_lock:
+            for client in self.__clients:
+                client.stop()
 
-            # Connect to itself to stop the blocking accept
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", self.__options.port))
+        # Connect to itself to stop the blocking accept
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("127.0.0.1", self.__options.port))
 
-            # Wait till the server thread is closed
-            self.__server_thread.join()
+        # Wait till the server thread is closed
+        self.__server_thread.join()
 
-            # Close the socket
-            self.__bind_socket.close()
+        # Close the socket
+        self.__bind_socket.close()
 
-            self.__logger.info("Stopped TCP connection %s", self.__options.address)
+        self.__logger.info("Stopped TCP connection %s", self.__options.address)

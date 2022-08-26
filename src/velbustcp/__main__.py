@@ -6,8 +6,7 @@ from velbustcp.lib.connection.bridge import Bridge
 from velbustcp.lib.connection.serial.bus import Bus
 from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
-from velbustcp.lib.ntp.ntp import Ntp
-from velbustcp.lib.settings.settings import serial_settings, network_settings, ntp_settings, logging_settings, validate_and_set_settings
+from velbustcp.lib.settings.settings import validate_and_set_settings
 from velbustcp.lib.util.util import setup_logging
 
 
@@ -22,17 +21,17 @@ class Main():
         """
 
         # Bridge
+        from velbustcp.lib.settings.settings import serial_settings
         bus = Bus(options=serial_settings)
 
         # Network manager
         network_manager = NetworkManager()
+        from velbustcp.lib.settings.settings import network_settings
         for connection in network_settings:
             network = Network(options=connection)
             network_manager.add_network(network)
 
-        ntp = Ntp(options=ntp_settings)
-
-        self.__bridge = Bridge(bus, network_manager, ntp)
+        self.__bridge = Bridge(bus, network_manager)
         self.__bridge.start()
 
     def main_loop(self):
@@ -65,6 +64,7 @@ if __name__ == '__main__':
         validate_and_set_settings(settings)
 
     # Setup logging
+    from velbustcp.lib.settings.settings import logging_settings
     logger = setup_logging(logging_settings)
 
     # Create main class

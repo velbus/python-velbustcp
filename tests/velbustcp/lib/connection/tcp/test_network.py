@@ -37,7 +37,7 @@ def test_send_not_active(mocker: MockFixture):
     spy = mocker.spy(network, 'is_active')
 
     # Act
-    network.send(bytearray([]), None)
+    network.send(bytearray([]))
 
     # Assert
     spy.assert_called_once()

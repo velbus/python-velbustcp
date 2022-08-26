@@ -10,9 +10,9 @@ BUS_BUFFER_FULL_DATA = bytearray([ETX, PRIORITY_HIGH, 0x00, 0x01, COMMAND_BUS_BU
 def test_default():
     status = BusStatus()
 
-    assert not status.buffer_ready
-    assert not status.active
-    assert not status.alive
+    assert status.buffer_ready
+    assert status.active
+    assert status.alive
 
 
 def test_alive():

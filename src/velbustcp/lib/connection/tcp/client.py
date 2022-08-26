@@ -1,35 +1,14 @@
 import logging
 import threading
 import socket
-import sys
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
-
-if sys.version_info >= (3, 8):  # pragma: no cover
-    from typing import Protocol
-else:  # pragma: no cover
-    from typing_extensions import Protocol
-
 from velbustcp.lib.packet.packetparser import PacketParser
-
-
-class OnClientPacketReceived(Protocol):
-    def __call__(self, client, packet):
-        # type: (Client, bytearray) -> None
-        pass  # pragma: no cover
-
-
-class OnClientClose(Protocol):
-    def __call__(self, client):
-        # type: (Client) -> None
-        pass  # pragma: no cover
+from velbustcp.lib.signals import on_tcp_receive, on_client_close
 
 
 class Client():
-
-    on_packet_receive: Optional[OnClientPacketReceived] = None
-    on_close: Optional[OnClientClose] = None
 
     def __init__(self, connection: ClientConnection):
         """Initialises a network client.
@@ -42,31 +21,35 @@ class Client():
         self.__connection: ClientConnection = connection
         self.__is_active: bool = False
         self.__address: str = connection.socket.getpeername()
+        self.__received_packets: List[bytearray] = []
 
     def start(self) -> None:
         """Starts receiving data from the client.
         """
 
         # Start a thread to handle receive
-        if not self.is_active():
-            self.__is_active = True
-            self.__logger.info("Starting client connection for %s", self.address())
-            self.__receive_thread = threading.Thread(target=self.__handle_client)
-            self.__receive_thread.name = f"TCP-RECV: {self.address()}"
-            self.__receive_thread.start()
+        if self.is_active():
+            return
+
+        self.__is_active = True
+        self.__logger.info("Starting client connection for %s", self.address())
+        self.__receive_thread = threading.Thread(target=self.__handle_client)
+        self.__receive_thread.name = f"TCP-RECV: {self.address()}"
+        self.__receive_thread.start()
 
     def stop(self) -> None:
         """Stops receiving data and disconnects from the client.
         """
 
-        if self.is_active():
-            self.__is_active = False
-            self.__logger.info("Closing client connection for %s", self.address())
-            self.__connection.socket.shutdown(socket.SHUT_RDWR)
-            self.__connection.socket.close()
+        if not self.is_active():
+            return
 
-            if self.on_close:
-                self.on_close(self)
+        self.__is_active = False
+        self.__logger.info("Closing client connection for %s", self.address())
+        self.__connection.socket.shutdown(socket.SHUT_RDWR)
+        self.__connection.socket.close()
+        del self.__received_packets
+        on_client_close.send(self)
 
     def send(self, data: bytearray):
         """Sends data to the client.
@@ -75,8 +58,14 @@ class Client():
             data (bytearray): The data to be sent.
         """
 
-        if self.is_active():
-            self.__connection.socket.sendall(data)
+        if not self.is_active():
+            return
+
+        if data in self.__received_packets:
+            self.__received_packets.remove(data)
+            return
+
+        self.__connection.socket.sendall(data)
 
     def is_active(self) -> bool:
         """Returns whether the client is active for communication.
@@ -163,9 +152,7 @@ class Client():
             parser.feed(bytearray(data))
             packet = parser.next()
 
-            while packet is not None:
-
-                if self.on_packet_receive:
-                    self.on_packet_receive(self, packet)
-
+            while packet:
+                self.__received_packets.append(packet)
+                on_tcp_receive.send(self, packet=packet)
                 packet = parser.next()
