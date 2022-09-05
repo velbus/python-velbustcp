@@ -1,6 +1,3 @@
-from asyncore import read
-from textwrap import wrap
-from typing import Optional
 import serial
 import serial.threaded
 import serial.tools.list_ports
@@ -31,7 +28,7 @@ class Bus():
 
             if old_state == self.__bus_status.alive:
                 return
-            
+
             if self.__bus_status.active:
                 self.__writer.unlock()
             else:
@@ -136,7 +133,7 @@ class Bus():
 
         self.__do_reconnect = False
         self.__connected = False
-        self.__reconnect_event.set()    
+        self.__reconnect_event.set()
 
         if self.__reader and self.__reader.alive:
             self.__reader.close()

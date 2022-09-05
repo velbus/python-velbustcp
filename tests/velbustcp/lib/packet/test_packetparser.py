@@ -37,7 +37,7 @@ next_test_data = [
 def test_feed(data, expected_result):
     parser = PacketParser()
     packets = parser.feed(data)
-    
+
     if expected_result:
         packet = packets[0]
         assert expected_result == packet

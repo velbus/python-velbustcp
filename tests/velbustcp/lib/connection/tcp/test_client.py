@@ -49,7 +49,7 @@ def test_auth_wrong_key(mocker: MockerFixture):
 
     def handle_client_close(sender, **kwargs):
         e.set()
-    on_client_close.connect(handle_client_close)   
+    on_client_close.connect(handle_client_close)
 
     client = Client(conn)
     client.start()
@@ -75,7 +75,7 @@ def test_auth_no_data(mocker: MockerFixture):
 
     def handle_client_close(sender, **kwargs):
         e.set()
-    on_client_close.connect(handle_client_close)   
+    on_client_close.connect(handle_client_close)
 
     client = Client(conn)
     client.start()
@@ -101,7 +101,7 @@ def test_auth_recv_exception(mocker: MockerFixture):
 
     def handle_client_close(sender, **kwargs):
         e.set()
-    on_client_close.connect(handle_client_close)   
+    on_client_close.connect(handle_client_close)
 
     client = Client(conn)
     client.start()
@@ -123,9 +123,11 @@ def test_packet_empty(mocker: MockFixture):
 
     # Create client
     e = threading.Event()
+
     def handle_client_close(sender, **kwargs):
         e.set()
-    on_client_close.connect(handle_client_close)   
+
+    on_client_close.connect(handle_client_close)
 
     client = Client(conn)
     client.start()
@@ -182,7 +184,8 @@ def test_packet_recv_exception(mocker: MockerFixture):
 
     def handle_client_close(sender, **kwargs):
         e.set()
-    on_client_close.connect(handle_client_close)   
+
+    on_client_close.connect(handle_client_close)
 
     client = Client(conn)
     client.start()
@@ -216,6 +219,7 @@ def test_client_send(mocker: MockerFixture):
     client.send(bytearray(data))
     conn.socket.sendall.assert_called_with(data)
     client.stop()
+
 
 def test_client_send_not_own_packet(mocker: MockerFixture):
 

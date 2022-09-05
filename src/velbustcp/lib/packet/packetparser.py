@@ -55,7 +55,7 @@ class PacketParser:
             return None
 
         start_valid = self.buffer[0] == consts.STX
-        priority_valid = self.buffer[1] in consts.PRIORITIES        
+        priority_valid = self.buffer[1] in consts.PRIORITIES
         checksum_valid = self.buffer[packet_length - 2] == self.checksum(self.buffer[0: 4 + body_length])
         end_valid = self.buffer[packet_length - 1] == consts.ETX
 
@@ -65,7 +65,7 @@ class PacketParser:
         packet = self.buffer[0: packet_length]
         self.buffer.shift(packet_length)
 
-        return packet        
+        return packet
 
     def __has_enough_bytes_for_new_packet(self) -> bool:
         """Determines if there are enough bytes in the buffer for a packet to be parsed.

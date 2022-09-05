@@ -5,6 +5,7 @@ import logging
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.signals import on_bus_receive, on_bus_fault
 
+
 class VelbusSerialProtocol(serial.threaded.Protocol):
     """Velbus serial protocol.
     """

@@ -13,12 +13,12 @@ class WriterThread(threading.Thread):
 
     def __init__(self, serial_instance: Serial):
         self.alive: bool = True
-        self.__serial: Serial = serial_instance        
+        self.__serial: Serial = serial_instance
         self.__logger = logging.getLogger("__main__." + __name__)
         self.__send_event: threading.Event = threading.Event()
-        self.__send_buffer: Deque[str] = deque()
+        self.__send_buffer: Deque[bytearray] = deque()
         self.__serial_lock: threading.Event = threading.Event()
-        self.unlock()       
+        self.unlock()
 
         threading.Thread.__init__(self)
 
@@ -86,7 +86,7 @@ class WriterThread(threading.Thread):
 
                     self.__serial.write(packet)
                     on_bus_send.send(self, packet=packet)
-                    
+
                     self.__logger.debug("Sent packet")
 
                 except Exception as e:

@@ -38,6 +38,7 @@ shift_data = [
     (5, 0)
 ]
 
+
 @pytest.mark.parametrize("amount, expected_length", shift_data)
 def test_shift(amount, expected_length):
     buffer = PacketBuffer()

@@ -1,7 +1,7 @@
 import itertools
 import collections
 import logging
-from typing import Deque, Union
+from typing import Deque, Union, overload
 
 from velbustcp.lib.consts import STX
 
@@ -26,20 +26,21 @@ class PacketBuffer:
 
         return len(self.__buffer)
 
-    def __getitem__(self, key) -> Union[bytearray, int]:
-        """[summary]
+    @overload
+    def __getitem__(self, key: int) -> int:
+        """..."""
 
-        Args:
-            key ([type]): [description]
+    @overload
+    def __getitem__(self, key: slice) -> bytearray:
+        """..."""
 
-        Returns:
-            int: [description]
-        """
+    def __getitem__(self, item: Union[int, slice]) -> Union[int, bytearray]:
+        """..."""
 
-        if isinstance(key, slice):
-            return bytearray(itertools.islice(self.__buffer, key.start, key.stop - key.start, key.step))
+        if isinstance(item, slice):
+            return bytearray(itertools.islice(self.__buffer, item.start, item.stop - item.start, item.step))
 
-        return self.__buffer[key]
+        return self.__buffer[item]
 
     def realign(self) -> None:
         """Realigns buffer by shifting the queue until the next STX or until the buffer runs out.
@@ -50,9 +51,7 @@ class PacketBuffer:
         while (amount < len(self.__buffer)) and (self.__buffer[amount] != STX):
             amount += 1
 
-
         self.shift(amount)
-
 
     def shift(self, amount: int) -> None:
         """Shifts the buffer by the specified amount.

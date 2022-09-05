@@ -24,7 +24,7 @@ class Network():
 
             if sender not in self.__clients:
                 return
-            
+
             with self.__clients_lock:
                 self.__clients.remove(sender)
         self.handle_client_close = handle_client_close
@@ -127,7 +127,6 @@ class Network():
         self.__server_thread = threading.Thread(target=self.__accept_sockets)
         self.__server_thread.name = "TCP server thread " + self.__options.host + ":" + str(self.__options.port)
         self.__server_thread.start()
-
 
     def stop(self) -> None:
         """Stops the TCP server

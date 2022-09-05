@@ -1,14 +1,5 @@
 from serial import serial_for_url, PARITY_NONE, STOPBITS_ONE, EIGHTBITS
-from velbustcp.lib.connection.serial.factory import find_port, set_serial_settings
-from velbustcp.lib.settings.serial import SerialSettings
-
-
-def test_find_port():
-    options = SerialSettings()
-    options.port = 12345
-    port = find_port(options)
-
-    #assert port == 12345
+from velbustcp.lib.connection.serial.factory import set_serial_settings
 
 
 def test_settings():

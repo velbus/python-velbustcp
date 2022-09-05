@@ -2,6 +2,7 @@ import logging
 from velbustcp.lib import consts
 from velbustcp.lib.signals import on_bus_receive
 
+
 class BusStatus():
 
     __active: bool = True

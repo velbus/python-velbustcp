@@ -1,8 +1,6 @@
 from pytest_mock import MockFixture
-from velbustcp.lib import consts
-from velbustcp.lib.connection.tcp.client import Client
-from velbustcp.lib.connection.tcp.network import Network
 
+from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 
 

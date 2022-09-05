@@ -1,5 +1,3 @@
-import logging
-
 from velbustcp.lib.connection.serial.bus import Bus
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 from velbustcp.lib.signals import on_bus_receive, on_bus_send, on_tcp_receive
