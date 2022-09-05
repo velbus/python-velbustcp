@@ -29,3 +29,18 @@ def test_index(data, expected_result):
     buffer = PacketBuffer()
     buffer.feed(bytearray([0x01, 0x02]))
     assert expected_result == buffer[data]
+
+
+shift_info = bytearray([0x01, 0x04, not STX, 0x09, 0x04])
+shift_data = [
+    (0, 5),
+    (1, 4),
+    (5, 0)
+]
+
+@pytest.mark.parametrize("amount, expected_length", shift_data)
+def test_shift(amount, expected_length):
+    buffer = PacketBuffer()
+    buffer.feed(shift_info)
+    buffer.shift(amount)
+    assert expected_length == len(buffer)

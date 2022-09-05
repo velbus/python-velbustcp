@@ -24,18 +24,14 @@ class VelbusSerialProtocol(serial.threaded.Protocol):
         """
 
         if data:
-            self.__parser.feed(bytearray(data))
+            packets = self.__parser.feed(bytearray(data))
 
-            # Try to get new packets in the parser
-            packet = self.__parser.next()
-
-            while packet:
+            for packet in packets:
 
                 if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
                     self.__logger.debug("[BUS IN] %s",  " ".join(hex(x) for x in packet))
 
                 on_bus_receive.send(self, packet=packet)
-                packet = self.__parser.next()
 
     def connection_lost(self, exc: Exception):
         self.__logger.error("Connection lost")

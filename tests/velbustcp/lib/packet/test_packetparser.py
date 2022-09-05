@@ -27,14 +27,19 @@ next_test_data = [
     # OK
     (acceptance_packet, acceptance_packet),
     # Realign due to invalid start, still returns packet
-    (bytearray([STX, 0x13, 0x00, 0xEF, 0x00] + acceptance_data), acceptance_packet),
+    (bytearray([STX, 0x13, 0x00, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x00] + acceptance_data), acceptance_packet),
     # Realign due to invalid start, and returns None
     (bytearray([STX, 0x13, 0x00, 0xEF, 0x00, STX, 0x13, 0x00, 0xEF, 0x00]), None)
 ]
 
 
 @pytest.mark.parametrize("data, expected_result", next_test_data)
-def test_next(data, expected_result):
+def test_feed(data, expected_result):
     parser = PacketParser()
-    parser.feed(data)
-    assert expected_result == parser.next()
+    packets = parser.feed(data)
+    
+    if expected_result:
+        packet = packets[0]
+        assert expected_result == packet
+    else:
+        assert len(packets) == 0

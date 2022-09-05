@@ -149,10 +149,8 @@ class Client():
                 self.__logger.info("Received no data from client %s", self.address())
                 return
 
-            parser.feed(bytearray(data))
-            packet = parser.next()
+            packets = parser.feed(bytearray(data))
 
-            while packet:
+            for packet in packets:
                 self.__received_packets.append(packet)
                 on_tcp_receive.send(self, packet=packet)
-                packet = parser.next()

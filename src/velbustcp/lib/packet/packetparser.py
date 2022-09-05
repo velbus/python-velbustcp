@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from velbustcp.lib import consts
 from velbustcp.lib.packet.packetbuffer import PacketBuffer
@@ -16,32 +16,6 @@ class PacketParser:
 
         self.buffer: PacketBuffer = PacketBuffer()
         self.logger = logging.getLogger("__main__." + __name__)
-
-    def __has_valid_header_waiting(self) -> bool:
-        """Checks whether or not the parser has a valid packet header waiting.
-
-        Returns:
-            bool: A boolean indicating whether or not the parser has a valid packet header waiting.
-        """
-
-        # Shortcut if the buffer isn't filled enough to have a header
-        if not self.__has_header_length():
-            return False
-
-        start_valid = self.buffer[0] == consts.STX
-        bodysize_valid = self.__curr_packet_body_length() <= consts.MAX_DATA_AMOUNT
-        priority_valid = self.buffer[1] in consts.PRIORITIES
-
-        return start_valid and bodysize_valid and priority_valid
-
-    def __has_header_length(self) -> bool:
-        """Determines if the buffer has enough data to have a header waiting.
-
-        Returns:
-            bool: Whether or not the buffer has enough data to have a header waiting.
-        """
-
-        return len(self.buffer) >= consts.HEADER_LENGTH
 
     @staticmethod
     def checksum(arr: bytearray) -> int:
@@ -62,76 +36,54 @@ class PacketParser:
 
         return crc
 
-    def __has_valid_packet_waiting(self) -> bool:
+    def __extract(self) -> Optional[bytearray]:
         """Checks whether or not the parser has a valid packet in its buffer.
 
         Returns:
             bool: A boolean indicating whether or not the parser has a valid packet in its buffer.
         """
 
-        # Make sure that the header in the packet is valid
-        if not self.__has_valid_header_waiting():
-            return False
-
         # Shortcut if we don't have enough bytes in the buffer to have a valid packet
+        if len(self.buffer) < consts.MIN_PACKET_LENGTH:
+            return None
+
+        body_length = self.buffer[3] & consts.LENGTH_MASK
+        packet_length = consts.MIN_PACKET_LENGTH + body_length
+
+        # Shortcut if we don't have enough bytes to complete the packet length specified in body
+        if len(self.buffer) < packet_length:
+            return None
+
+        start_valid = self.buffer[0] == consts.STX
+        priority_valid = self.buffer[1] in consts.PRIORITIES        
+        checksum_valid = self.buffer[packet_length - 2] == self.checksum(self.buffer[0: 4 + body_length])
+        end_valid = self.buffer[packet_length - 1] == consts.ETX
+
+        if not (start_valid and priority_valid and checksum_valid and end_valid):
+            return None
+
+        packet = self.buffer[0: packet_length]
+        self.buffer.shift(packet_length)
+
+        return packet        
+
+    def __has_enough_bytes_for_new_packet(self) -> bool:
+        """Determines if there are enough bytes in the buffer for a packet to be parsed.
+
+        Returns:
+            bool: Whether or not there are enough bytes in the buffer.
+        """
+
+        # Make sure we have the minimal packet length waiting in buffer
         if len(self.buffer) < consts.MIN_PACKET_LENGTH:
             return False
 
-        # Shortcut if we don't have enough bytes to complete the packet length specified in body
-        if not self.__has_packet_length_waiting():
-            return False
+        # Return whether or not we have a full packet body's worth of packets waiting
+        body_length = self.buffer[3] & consts.LENGTH_MASK
+        packet_length = consts.MIN_PACKET_LENGTH + body_length
+        return len(self.buffer) >= packet_length
 
-        bytes_to_check = bytearray(self.buffer[0: 4 + self.__curr_packet_body_length()])
-        checksum_valid = self.buffer[self.__curr_packet_length() - 2] == self.checksum(bytes_to_check)
-        end_valid = self.buffer[self.__curr_packet_length() - 1] == consts.ETX
-
-        return checksum_valid and end_valid
-
-    def __has_packet_length_waiting(self) -> bool:
-        """Checks whether the current packet has the full length's worth of data waiting in the buffer.
-        This should only be called when __has_valid_header_waiting() returns True.
-
-        Returns:
-            bool: Whether or not the buffer has at least the packet length available.
-        """
-
-        return len(self.buffer) >= self.__curr_packet_length()
-
-    def __curr_packet_length(self) -> int:
-        """Gets the current waiting packet's total length.
-        This should only be called when __has_valid_header_waiting() returns True.
-
-        Returns:
-            int: The current waiting packet's total length.
-        """
-
-        return consts.MIN_PACKET_LENGTH + self.__curr_packet_body_length()
-
-    def __curr_packet_body_length(self) -> int:
-        """Gets the current waiting packet's body length.
-        This should only be called when __has_header_length() returns True.
-
-        Returns:
-            int: The current waiting packet's body length.
-        """
-
-        return int(self.buffer[3]) & consts.LENGTH_MASK
-
-    def __extract_packet(self) -> bytearray:
-        """Extracts a packet from the buffer and shifts it.
-        Make sure this is only called after __has_valid_packet_waiting() return True.
-
-        Returns:
-            bytearray: A bytearray with the currently waiting packet.
-        """
-
-        length = self.__curr_packet_length()
-        packet = bytearray(self.buffer[0: length])
-        self.buffer.shift(length)
-
-        return packet
-
-    def feed(self, array: bytearray) -> None:
+    def feed(self, array: bytearray) -> List[bytearray]:
         """Feed data into the parser to be processed.
 
         Args:
@@ -139,25 +91,17 @@ class PacketParser:
         """
 
         self.buffer.feed(array)
+        packets = []
 
-    def next(self) -> Optional[bytearray]:
-        """Attempts to get a packet from the parser.
-        This is a safe operation if there are no packets waiting in the parser.
+        while self.__has_enough_bytes_for_new_packet():
 
-        Returns:
-            bytearray: Will return a bytearray if there is a packet present, None if there is no packet available.
-        """
-        packet = None
+            # Do we straight up have a valid packet?
+            packet = self.__extract()
+            if packet:
+                packets.append(packet)
 
-        # Check if we have a valid packet until we don't have anything left in buffer
-        has_valid_packet = self.__has_valid_packet_waiting()
+            # Is the buffer full enough to realign?
+            else:
+                self.buffer.realign()
 
-        while (not has_valid_packet) and self.__has_valid_header_waiting() and self.__has_packet_length_waiting():
-            self.buffer.realign()
-            has_valid_packet = self.__has_valid_packet_waiting()
-
-        # If we have a valid packet, extract it
-        if has_valid_packet:
-            packet = self.__extract_packet()
-
-        return packet
+        return packets

@@ -39,7 +39,7 @@ class PacketBuffer:
         if isinstance(key, slice):
             return bytearray(itertools.islice(self.__buffer, key.start, key.stop - key.start, key.step))
 
-        return int(self.__buffer[key])
+        return self.__buffer[key]
 
     def realign(self) -> None:
         """Realigns buffer by shifting the queue until the next STX or until the buffer runs out.
@@ -50,15 +50,9 @@ class PacketBuffer:
         while (amount < len(self.__buffer)) and (self.__buffer[amount] != STX):
             amount += 1
 
-        print("realign")
-        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-            self.__logger.debug(f"Realigning |:{list(self.__buffer)}:|")
 
         self.shift(amount)
 
-        print("realign")
-        if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-            self.__logger.debug(f"Realigned  |:{list(self.__buffer)}:|")
 
     def shift(self, amount: int) -> None:
         """Shifts the buffer by the specified amount.
