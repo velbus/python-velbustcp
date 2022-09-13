@@ -71,13 +71,7 @@ class WriterThread(threading.Thread):
                     time.sleep(consts.SEND_DELAY - delta_time)
 
                 # Wait for serial lock to be not set
-                if self.__logger.isEnabledFor(logging.DEBUG):
-                    self.__logger.debug("Wait serial lock")
-
                 self.__serial_lock.wait()
-
-                if self.__logger.isEnabledFor(logging.DEBUG):
-                    self.__logger.debug("After wait serial lock")
 
                 # Write packet and set new last send time
                 try:
@@ -86,8 +80,6 @@ class WriterThread(threading.Thread):
 
                     self.__serial.write(packet)
                     on_bus_send.send(self, packet=packet)
-
-                    self.__logger.debug("Sent packet")
 
                 except Exception as e:
                     self.__logger.exception(e)
