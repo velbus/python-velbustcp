@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from velbustcp.lib import consts
 from velbustcp.lib.packet.packetbuffer import PacketBuffer
+from velbustcp.lib.packet.utils import calculate_data_length_from_flag
 
 
 class PacketParser:
@@ -47,7 +48,8 @@ class PacketParser:
         if len(self.buffer) < consts.MIN_PACKET_LENGTH:
             return None
 
-        body_length = self.buffer[3] & consts.LENGTH_MASK
+        body_length_flag = self.buffer[3] & consts.LENGTH_MASK
+        body_length = calculate_data_length_from_flag(body_length_flag)
         packet_length = consts.MIN_PACKET_LENGTH + body_length
 
         # Shortcut if we don't have enough bytes to complete the packet length specified in body
