@@ -1,6 +1,6 @@
 import ipaddress
 import os
-from typing import Dict, Tuple
+from typing import Dict, Tuple  # noqa: F401
 from velbustcp.lib.util.util import str2bool
 
 
