@@ -1,6 +1,7 @@
 import argparse
 import json
 from threading import Event
+import sys
 
 from velbustcp.lib.connection.bridge import Bridge
 from velbustcp.lib.connection.serial.bus import Bus
@@ -48,8 +49,8 @@ class Main():
         self.__bridge.stop()
 
 
-if __name__ == '__main__':
-
+def main(args=None):
+    """Main method."""
     parser = argparse.ArgumentParser(description="Velbus communication")
     parser.add_argument("--settings", help="Settings file", required=False)
     args = parser.parse_args()
@@ -83,3 +84,7 @@ if __name__ == '__main__':
         main.stop()
 
     logger.info("Shutted down")
+
+
+if __name__ == '__main__':
+    sys.exit(main())

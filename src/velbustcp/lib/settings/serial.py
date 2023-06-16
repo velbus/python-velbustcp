@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict  # noqa: F401
 from velbustcp.lib.util.util import str2bool
 
 

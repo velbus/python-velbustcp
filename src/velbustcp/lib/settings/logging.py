@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict  # noqa: F401
 
 LOGGING_TYPES = ["debug", "info"]
 LOGGING_OUTPUT = ["syslog", "stream"]
