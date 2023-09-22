@@ -2,6 +2,7 @@ import threading
 import socket
 import ssl
 import logging
+import platform
 from typing import List
 from velbustcp.lib.connection.tcp.client import Client
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
@@ -82,6 +83,20 @@ class Network():
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+            # On Linux the following socket option succeeds binding to the specified IP address
+            # even if it is not currently assigned to any of the interfaces, which foregoes the
+            # need for this entire retry logic (still necessary for non-Linux systems) that
+            # follows.
+            #
+            # FreeBSD has IP_BINDANY and OpenBSD has SO_BINDANY, but at least the latter is a
+            # privileged operation.
+            if platform.system() == "Linux":
+                try:
+                    IP_FREEBIND = 15
+                    sock.setsockopt(socket.SOL_IP, IP_FREEBIND, 1)
+                except Exception as e:
+                    self.__logger.debug("Could not set IP_FREEBIND for socket at %s: %s", self.__options.address, e)
 
             try:
                 sock.bind(self.__options.address)
