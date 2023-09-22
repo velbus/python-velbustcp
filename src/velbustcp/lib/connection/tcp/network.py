@@ -33,7 +33,12 @@ class Network():
         self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
         self.__clients: List[Client] = []
         self.__clients_lock: threading.Lock = threading.Lock()
-        self.__running: bool = False
+        # Indicate that the server should be terminated (but does not necessarily indicate that it
+        # is has been terminated.
+        self.__stop: threading.Event = threading.Event()
+        self.__stop.set()
+        self.__bind_socket: Optional[socket.socket] = None
+        self.__context: Optional[ssl.SSLContext] = None
         self.__options: NetworkSettings = options
 
     def send(self, data: bytearray) -> None:
@@ -59,39 +64,78 @@ class Network():
                 except Exception:
                     self.__logger.exception("Could not send data to client %s", client.address())
 
-    def __accept_sockets(self) -> None:
-        """Accepts clients from socket, if the tcp server is closed it will also close socket
+    def __get_bound_socket(self) -> socket.socket:
+        RETRY_DELAY = 5.0
+
+        while self.is_active() and not self.__bind_socket:
+            # First, try to initialize the SSL context (as we only need to do it once and once done
+            # we won’t need to return to trying this, most likely.)
+            if self.__options.ssl and not self.__context:
+                try:
+                    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                    context.load_cert_chain(self.__options.cert, keyfile=self.__options.pk)
+                    self.__context = context
+                except Exception as e:
+                    self.__logger.error("Could not initialize SSL for %s: %s", self.__options.address, e)
+                    self.__stop.wait(RETRY_DELAY)
+                    continue
+
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+            try:
+                sock.bind(self.__options.address)
+            except OSError as e:
+                self.__logger.error("Could not bind to %s: %s", self.__options.address, e)
+                self.__stop.wait(RETRY_DELAY)
+                continue
+
+            try:
+                sock.listen(0)
+            except OSError as e:
+                self.__logger.error("Could not listen on %s: %s", self.__options.address, e)
+                self.__stop.wait(RETRY_DELAY)
+                continue
+
+            self.__bind_socket = sock
+            self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
+        return self.__bind_socket
+
+
+    def __bind_and_accept_sockets(self) -> None:
+        """Binds a listener socket and accept clients from it.
+
+        If the tcp server is closed it will also close socket
         """
 
         while self.is_active():
-
             try:
-                client_socket, address = self.__bind_socket.accept()
+                client_socket, address = self.__get_bound_socket().accept()
+            except OSError as e:
+                self.__logger.error("Couldn't accept socket: %s", e)
+                continue
 
-                # Make sure that we're still active
-                if not self.is_active():
-                    return
+            # Make sure that we're still active
+            if not self.is_active():
+                return
+            self.__logger.info("TCP connection from %s", address)
 
-                self.__logger.info("TCP connection from %s", address)
+            if self.__options.ssl:
+                client_socket = self.__context.wrap_socket(client_socket, server_side=True)
 
-                if self.__options.ssl:
-                    client_socket = self.__context.wrap_socket(client_socket, server_side=True)
+            # Define client connection
+            connection = ClientConnection()
+            connection.socket = client_socket
+            connection.should_authorize = self.__options.auth
+            connection.authorization_key = self.__options.auth_key
 
-                # Define client connection
-                connection = ClientConnection()
-                connection.socket = client_socket
-                connection.should_authorize = self.__options.auth
-                connection.authorization_key = self.__options.auth_key
+            # Start client
+            client = Client(connection)
+            client.start()
 
-                # Start client
-                client = Client(connection)
-                client.start()
+            with self.__clients_lock:
+                self.__clients.append(client)
 
-                with self.__clients_lock:
-                    self.__clients.append(client)
-
-            except Exception:
-                self.__logger.exception("Couldn't accept socket")
 
     def is_active(self) -> bool:
         """Returns whether or not the TCP connection is active
@@ -100,7 +144,7 @@ class Network():
             bool: Whether or not the TCP connection is active
         """
 
-        return self.__running
+        return not self.__stop.is_set()
 
     def start(self) -> None:
         """Starts up the TCP server
@@ -108,23 +152,10 @@ class Network():
 
         if self.is_active():
             return
-
-        self.__bind_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__bind_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__bind_socket.bind(self.__options.address)
-        self.__bind_socket.listen(0)
-
-        if self.__options.ssl:
-            self.__context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            self.__context.load_cert_chain(self.__options.cert, keyfile=self.__options.pk)
-
-        self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
-
-        # Now that we reached here, set running
-        self.__running = True
+        self.__stop.clear()
 
         # Start the server thread to handle connections
-        self.__server_thread = threading.Thread(target=self.__accept_sockets)
+        self.__server_thread = threading.Thread(target=self.__bind_and_accept_sockets)
         self.__server_thread.name = "TCP server thread " + self.__options.host + ":" + str(self.__options.port)
         self.__server_thread.start()
 
@@ -136,23 +167,24 @@ class Network():
             return
 
         self.__logger.info("Stopping TCP connection %s", self.__options.address)
+        self.__stop.set()
 
-        # Set running to false
-        self.__running = False
+        # Stop accepting further connections.
+        try:
+            # Shutting down the socket also interrupts the `accept` call within the
+            # __server_thread, thus terminating it.
+            self.__bind_socket.shutdown(socket.SHUT_RDWR)
+            self.__bind_socket.close()
+            self.__bind_socket = None
+        except AttributeError:
+            pass
+
+        # Wait till the server thread is closed
+        self.__server_thread.join()
 
         # Stop every client listening
         with self.__clients_lock:
             for client in self.__clients:
                 client.stop()
-
-        # Connect to itself to stop the blocking accept
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(("127.0.0.1", self.__options.port))
-
-        # Wait till the server thread is closed
-        self.__server_thread.join()
-
-        # Close the socket
-        self.__bind_socket.close()
 
         self.__logger.info("Stopped TCP connection %s", self.__options.address)
