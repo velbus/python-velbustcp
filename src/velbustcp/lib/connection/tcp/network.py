@@ -101,7 +101,7 @@ class Network():
             try:
                 sock.bind(self.__options.address)
             except OSError as e:
-                self.__logger.error("Could not bind to %s: %s", self.__options.address, e)
+                self.__logger.exception("Could not bind to %s", self.__options.address)
                 self.__stop.wait(RETRY_DELAY)
                 continue
 
