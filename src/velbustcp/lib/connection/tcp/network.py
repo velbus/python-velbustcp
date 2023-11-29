@@ -3,7 +3,7 @@ import socket
 import ssl
 import logging
 import platform
-from typing import List
+from typing import List, Optional
 from velbustcp.lib.connection.tcp.client import Client
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.settings.network import NetworkSettings
