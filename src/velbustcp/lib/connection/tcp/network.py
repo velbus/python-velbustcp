@@ -65,7 +65,7 @@ class Network():
                 except Exception:
                     self.__logger.exception("Could not send data to client %s", client.address())
 
-    def __get_bound_socket(self) -> socket.socket:
+    def __get_bound_socket(self) -> Optional[socket.socket]:
         RETRY_DELAY = 5.0
 
         while self.is_active() and not self.__bind_socket:
