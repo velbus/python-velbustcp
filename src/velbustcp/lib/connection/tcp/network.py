@@ -108,7 +108,7 @@ class Network():
             try:
                 sock.listen(0)
             except OSError as e:
-                self.__logger.error("Could not listen on %s: %s", self.__options.address, e)
+                self.__logger.exception("Could not listen on %s", self.__options.address)
                 self.__stop.wait(RETRY_DELAY)
                 continue
 
