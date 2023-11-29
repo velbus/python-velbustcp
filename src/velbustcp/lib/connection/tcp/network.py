@@ -38,7 +38,11 @@ class Network():
         # is has been terminated.
         self.__stop: threading.Event = threading.Event()
         self.__stop.set()
+
         self.__bind_socket: Optional[socket.socket] = None
+        # Synchronizes `__bind_socket` modifications
+        self.__socket_lock: threading.Lock = threading.Lock()
+
         self.__context: Optional[ssl.SSLContext] = None
         self.__options: NetworkSettings = options
 
@@ -112,8 +116,14 @@ class Network():
                 self.__stop.wait(RETRY_DELAY)
                 continue
 
-            self.__bind_socket = sock
-            self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
+            # This check is required for `stop()` logic with `shutdown()`s to work correctly – for
+            # it to work `__bind_socket` must never become `non-None` after `self.__stop` gets set.
+            with self.__socket_lock:
+                if self.is_active():
+                    self.__bind_socket = sock
+                    self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
+                else:
+                    sock.close()
         return self.__bind_socket
 
 
@@ -186,17 +196,19 @@ class Network():
             return
 
         self.__logger.info("Stopping TCP connection %s", self.__options.address)
-        self.__stop.set()
 
-        # Stop accepting further connections.
-        try:
-            # Shutting down the socket also interrupts the `accept` call within the
-            # __server_thread, thus terminating it.
-            self.__bind_socket.shutdown(socket.SHUT_RDWR)
-            self.__bind_socket.close()
-            self.__bind_socket = None
-        except AttributeError:
-            pass
+        with self.__socket_lock:
+            self.__stop.set()
+            try:
+                # Stop accepting further connections.
+                #
+                # Shutting down the socket also interrupts the `accept` call within the
+                # __server_thread, thus terminating it.
+                self.__bind_socket.shutdown(socket.SHUT_RDWR)
+                self.__bind_socket.close()
+                self.__bind_socket = None
+            except AttributeError:
+                pass
 
         # Wait till the server thread is closed
         self.__server_thread.join()
