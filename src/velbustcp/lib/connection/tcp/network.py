@@ -124,8 +124,12 @@ class Network():
         """
 
         while self.is_active():
+            listen_socket = self.__get_bound_socket()
+            if listen_socket is None:
+                continue # `self.is_active()` most likely became `False`
+
             try:
-                client_socket, address = self.__get_bound_socket().accept()
+                client_socket, address = listen_socket.accept()
             except OSError as e:
                 self.__logger.exception("Couldn't accept socket")
                 continue
