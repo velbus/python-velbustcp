@@ -77,7 +77,7 @@ class Network():
                     context.load_cert_chain(self.__options.cert, keyfile=self.__options.pk)
                     self.__context = context
                 except Exception as e:
-                    self.__logger.error("Could not initialize SSL for %s: %s", self.__options.address, e)
+                    self.__logger.exception("Could not initialize SSL for %s", self.__options.address)
                     self.__stop.wait(RETRY_DELAY)
                     continue
 
