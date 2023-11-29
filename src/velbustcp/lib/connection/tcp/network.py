@@ -127,7 +127,7 @@ class Network():
             try:
                 client_socket, address = self.__get_bound_socket().accept()
             except OSError as e:
-                self.__logger.error("Couldn't accept socket: %s", e)
+                self.__logger.exception("Couldn't accept socket")
                 continue
 
             # Make sure that we're still active
