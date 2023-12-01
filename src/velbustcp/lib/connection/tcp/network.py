@@ -80,7 +80,7 @@ class Network():
                     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                     context.load_cert_chain(self.__options.cert, keyfile=self.__options.pk)
                     self.__context = context
-                except Exception as e:
+                except Exception:
                     self.__logger.exception("Could not initialize SSL for %s", self.__options.address)
                     self.__stop.wait(RETRY_DELAY)
                     continue
@@ -104,14 +104,14 @@ class Network():
 
             try:
                 sock.bind(self.__options.address)
-            except OSError as e:
+            except OSError:
                 self.__logger.exception("Could not bind to %s", self.__options.address)
                 self.__stop.wait(RETRY_DELAY)
                 continue
 
             try:
                 sock.listen(0)
-            except OSError as e:
+            except OSError:
                 self.__logger.exception("Could not listen on %s", self.__options.address)
                 self.__stop.wait(RETRY_DELAY)
                 continue
@@ -126,7 +126,6 @@ class Network():
                     sock.close()
         return self.__bind_socket
 
-
     def __bind_and_accept_sockets(self) -> None:
         """Binds a listener socket and accept clients from it.
 
@@ -136,11 +135,11 @@ class Network():
         while self.is_active():
             listen_socket = self.__get_bound_socket()
             if listen_socket is None:
-                continue # `self.is_active()` most likely became `False`
+                continue  # `self.is_active()` most likely became `False`
 
             try:
                 client_socket, address = listen_socket.accept()
-            except OSError as e:
+            except OSError:
                 self.__logger.exception("Couldn't accept socket")
                 continue
 
@@ -164,7 +163,6 @@ class Network():
 
             with self.__clients_lock:
                 self.__clients.append(client)
-
 
     def is_active(self) -> bool:
         """Returns whether or not the TCP connection is active
