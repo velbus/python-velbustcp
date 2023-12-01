@@ -148,8 +148,10 @@ class Network():
                 return
             self.__logger.info("TCP connection from %s", address)
 
-            if self.__options.ssl:
+            if self.__context is not None:
                 client_socket = self.__context.wrap_socket(client_socket, server_side=True)
+            else:
+                assert not self.__options.ssl, "SSL should have been set-up when SSL is enabled"
 
             # Define client connection
             connection = ClientConnection()
@@ -197,7 +199,7 @@ class Network():
 
         with self.__socket_lock:
             self.__stop.set()
-            try:
+            if self.__bind_socket is not None:
                 # Stop accepting further connections.
                 #
                 # Shutting down the socket also interrupts the `accept` call within the
@@ -205,8 +207,6 @@ class Network():
                 self.__bind_socket.shutdown(socket.SHUT_RDWR)
                 self.__bind_socket.close()
                 self.__bind_socket = None
-            except AttributeError:
-                pass
 
         # Wait till the server thread is closed
         self.__server_thread.join()
