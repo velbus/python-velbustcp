@@ -34,8 +34,8 @@ class Network():
         self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
         self.__clients: List[Client] = []
         self.__clients_lock: threading.Lock = threading.Lock()
-        # Indicate that the server should be terminated (but does not necessarily indicate that it
-        # is has been terminated.
+        # Indicate that the server should be terminated
+        # (but does not necessarily indicate that it has been terminated).
         self.__stop: threading.Event = threading.Event()
         self.__stop.set()
 
@@ -121,7 +121,9 @@ class Network():
             with self.__socket_lock:
                 if self.is_active():
                     self.__bind_socket = sock
-                    self.__logger.info("Listening to TCP connections on %s [SSL:%s]", self.__options.address, "enabled" if self.__options.ssl else "disabled")
+                    ssl_str = "enabled" if self.__options.ssl else "disabled"
+                    auth_str = "enabled" if self.__options.auth else "disabled"
+                    self.__logger.info(f"Listening to TCP connections on {self.__options.address} [SSL:{ssl_str}] [AUTH:{auth_str}]")
                 else:
                     sock.close()
         return self.__bind_socket
@@ -140,7 +142,8 @@ class Network():
             try:
                 client_socket, address = listen_socket.accept()
             except OSError:
-                self.__logger.exception("Couldn't accept socket")
+                if not self.__stop.is_set():
+                    self.__logger.exception("Couldn't accept socket")
                 continue
 
             # Make sure that we're still active
@@ -149,7 +152,11 @@ class Network():
             self.__logger.info("TCP connection from %s", address)
 
             if self.__context is not None:
-                client_socket = self.__context.wrap_socket(client_socket, server_side=True)
+                try:
+                    client_socket = self.__context.wrap_socket(client_socket, server_side=True)
+                except ssl.SSLError:
+                    self.__logger.exception("SSL handshake failed")
+                    continue
             else:
                 assert not self.__options.ssl, "SSL should have been set-up when SSL is enabled"
 
