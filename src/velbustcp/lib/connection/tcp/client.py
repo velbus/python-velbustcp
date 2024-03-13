@@ -48,7 +48,7 @@ class Client():
         self.__logger.info("Closing client connection for %s", self.address())
         self.__connection.socket.shutdown(socket.SHUT_RDWR)
         self.__connection.socket.close()
-        del self.__received_packets
+        self.__received_packets.clear()
         on_client_close.send(self)
 
     def send(self, data: bytearray):

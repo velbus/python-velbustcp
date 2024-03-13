@@ -83,7 +83,7 @@ def main(args=None):
     finally:
         main.stop()
 
-    logger.info("Shutted down")
+    logger.info("Shutdown")
 
 
 if __name__ == '__main__':
