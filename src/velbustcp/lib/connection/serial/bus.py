@@ -144,6 +144,8 @@ class Bus():
             self.__writer.close()
 
         if self.__serial_port.isOpen():
+            self.__serial_port.cancel_read()
+            self.__serial_port.cancel_write()
             self.__serial_port.close()
 
     def send(self, packet: bytearray) -> None:
