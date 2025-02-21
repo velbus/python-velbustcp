@@ -51,7 +51,7 @@ class WriterThread(threading.Thread):
         """
 
         last_send_time = time.monotonic()
-        self.alive: bool = True
+        self.alive = True
 
         while self.alive and self.__serial.is_open:
             self.__send_event.wait()
