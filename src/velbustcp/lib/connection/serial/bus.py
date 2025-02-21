@@ -120,7 +120,7 @@ class Bus():
         self.__writer = WriterThread(serial_port)
         self.__writer.start()
 
-        self.__serial_port = serial_port 
+        self.__serial_port = serial_port
 
         self.__logger.info("Serial connection active on port %s", self.__port)
 
