@@ -120,6 +120,8 @@ class Bus():
         self.__writer = WriterThread(serial_port)
         self.__writer.start()
 
+        self.__serial_port = serial_port 
+
         self.__logger.info("Serial connection active on port %s", self.__port)
 
     def stop(self) -> None:
@@ -140,6 +142,9 @@ class Bus():
 
         if self.__writer and self.__writer.alive:
             self.__writer.close()
+
+        if self.__serial_port.isOpen():
+            self.__serial_port.close()
 
     def send(self, packet: bytearray) -> None:
         """Queues a packet to be sent on the serial connection.
