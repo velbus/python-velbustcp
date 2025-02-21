@@ -12,7 +12,7 @@ from velbustcp.lib.signals import on_bus_send
 class WriterThread(threading.Thread):
 
     def __init__(self, serial_instance: Serial):
-        self.alive: bool = True
+        self.alive: bool = False
         self.__serial: Serial = serial_instance
         self.__logger = logging.getLogger("__main__." + __name__)
         self.__send_event: threading.Event = threading.Event()
@@ -51,7 +51,8 @@ class WriterThread(threading.Thread):
         """
 
         last_send_time = time.monotonic()
-
+        self.alive: bool = True
+        
         while self.alive and self.__serial.is_open:
             self.__send_event.wait()
             self.__send_event.clear()
