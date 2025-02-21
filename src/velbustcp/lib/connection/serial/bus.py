@@ -51,6 +51,8 @@ class Bus():
         self.__do_reconnect: bool = False
         self.__connected: bool = False
 
+        self.__serial_port = None
+
     def __reconnect(self) -> None:
         """Reconnects until active.
         """
@@ -104,23 +106,22 @@ class Bus():
         if not self.__port:
             raise ValueError("Couldn't find a port to open communication on")
 
-        serial_port = construct_serial_obj(self.__port)
+        if self.__serial_port is None: 
+            self.__serial_port = construct_serial_obj(self.__port)
 
-        if not serial_port.isOpen():
+        if not self.__serial_port.isOpen():
             raise Exception("Couldn't open port {0}".format(self.__port))
 
         # Now that we're connected, set connected state
         self.__connected = True
 
         # Create reader thread
-        self.__reader = serial.threaded.ReaderThread(serial_port, VelbusSerialProtocol())
+        self.__reader = serial.threaded.ReaderThread(self.__serial_port, VelbusSerialProtocol())
         self.__reader.start()
 
         # Create write thread
-        self.__writer = WriterThread(serial_port)
+        self.__writer = WriterThread(self.__serial_port)
         self.__writer.start()
-
-        self.__serial_port = serial_port
 
         self.__logger.info("Serial connection active on port %s", self.__port)
 
@@ -142,11 +143,6 @@ class Bus():
 
         if self.__writer and self.__writer.alive:
             self.__writer.close()
-
-        if self.__serial_port.isOpen():
-            self.__serial_port.cancel_read()
-            self.__serial_port.cancel_write()
-            self.__serial_port.close()
 
     def send(self, packet: bytearray) -> None:
         """Queues a packet to be sent on the serial connection.
