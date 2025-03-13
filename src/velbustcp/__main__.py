@@ -2,9 +2,10 @@ import argparse
 import json
 from threading import Event
 import sys
+import asyncio
 
 from velbustcp.lib.connection.bridge import Bridge
-from velbustcp.lib.connection.serial.bus import Bus
+from velbustcp.lib.connection.newserial.bus import Bus
 from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 from velbustcp.lib.settings.settings import validate_and_set_settings
@@ -33,31 +34,30 @@ class Main():
             network_manager.add_network(network)
 
         self.__bridge = Bridge(bus, network_manager)
-        self.__bridge.start()
+
+    async def start(self):
+        """Starts the bridge."""
+        await self.__bridge.start()
+
+    async def stop(self):
+        """Stops the bridge."""
+        await self.__bridge.stop()
 
     def main_loop(self):
         """Main loop for the program, blocks infinitely until it receives a KeyboardInterrupt.
         """
-
         q = Event()
         q.wait()
 
-    def stop(self):
-        """Stops bridge.
-        """
 
-        self.__bridge.stop()
-
-
-def main(args=None):
-    """Main method."""
+async def main_async(args=None):
+    """Main asynchronous method."""
     parser = argparse.ArgumentParser(description="Velbus communication")
     parser.add_argument("--settings", help="Settings file", required=False)
     args = parser.parse_args()
 
     # If settings are supplied, read and validate them
     if args.settings:
-
         # Open settings file
         with open(args.settings, 'r') as f:
             settings = json.load(f)
@@ -72,6 +72,7 @@ def main(args=None):
     main = Main()
 
     try:
+        await main.start()
         main.main_loop()
 
     except KeyboardInterrupt:
@@ -81,9 +82,14 @@ def main(args=None):
         logger.exception(e)
 
     finally:
-        main.stop()
+        await main.stop()
 
     logger.info("Shutdown")
+
+
+def main(args=None):
+    """Main method."""
+    asyncio.run(main_async(args))
 
 
 if __name__ == '__main__':
