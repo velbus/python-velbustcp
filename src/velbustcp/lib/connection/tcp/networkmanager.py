@@ -1,5 +1,6 @@
 import logging
 from typing import List
+import asyncio
 
 from velbustcp.lib.connection.tcp.network import Network
 
@@ -13,26 +14,26 @@ class NetworkManager:
     def add_network(self, network: Network):
         self.__networks.append(network)
 
-    def start(self):
+    async def start(self):
         """Starts all available networks.
         """
 
-        for network in self.__networks:
-            network.start()
+        tasks = [network.start() for network in self.__networks]
+        await asyncio.gather(*tasks)
 
-    def stop(self):
+    async def stop(self):
         """Stops all connected networks.
         """
 
-        for network in self.__networks:
-            network.stop()
+        tasks = [network.stop() for network in self.__networks]
+        await asyncio.gather(*tasks)
 
-    def send(self, packet: bytearray):
+    async def send(self, packet: bytearray):
         """Sends the given packet to all networks.
 
         Args:
             packet (bytearray): The packet to send.
         """
 
-        for network in self.__networks:
-            network.send(packet)
+        tasks = [network.send(packet) for network in self.__networks]
+        await asyncio.gather(*tasks)

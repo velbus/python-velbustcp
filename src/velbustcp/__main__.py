@@ -5,7 +5,7 @@ import sys
 import asyncio
 
 from velbustcp.lib.connection.bridge import Bridge
-from velbustcp.lib.connection.newserial.bus import Bus
+from velbustcp.lib.connection.serial.bus import Bus
 from velbustcp.lib.connection.tcp.network import Network
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 from velbustcp.lib.settings.settings import validate_and_set_settings
@@ -86,11 +86,5 @@ async def main_async(args=None):
 
     logger.info("Shutdown")
 
-
-def main(args=None):
-    """Main method."""
-    asyncio.run(main_async(args))
-
-
 if __name__ == '__main__':
-    sys.exit(main())
+    asyncio.run(main_async())

@@ -1,14 +1,13 @@
 import logging
-import threading
-import socket
-from typing import Any, Optional, List
+import asyncio
+from typing import Any, List
 
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.signals import on_tcp_receive, on_client_close
 
 
-class Client():
+class Client:
 
     def __init__(self, connection: ClientConnection):
         """Initialises a network client.
@@ -20,24 +19,29 @@ class Client():
         self.__logger: logging.Logger = logging.getLogger("__main__." + __name__)
         self.__connection: ClientConnection = connection
         self.__is_active: bool = False
-        self.__address: str = connection.socket.getpeername()
+        self.__address: str = connection.writer.get_extra_info('peername')
         self.__received_packets: List[bytearray] = []
 
-    def start(self) -> None:
+    async def start(self) -> None:
         """Starts receiving data from the client.
         """
 
-        # Start a thread to handle receive
         if self.is_active():
             return
 
         self.__is_active = True
         self.__logger.info("Starting client connection for %s", self.address())
-        self.__receive_thread = threading.Thread(target=self.__handle_client)
-        self.__receive_thread.name = f"TCP-RECV: {self.address()}"
-        self.__receive_thread.start()
 
-    def stop(self) -> None:
+        if not await self.__handle_authorization():
+            self.__logger.warning("Client authorization failed for %s", self.address())
+            await self.stop()
+            return
+
+        await self.__handle_packets()
+
+        await self.stop()
+
+    async def stop(self) -> None:
         """Stops receiving data and disconnects from the client.
         """
 
@@ -46,12 +50,12 @@ class Client():
 
         self.__is_active = False
         self.__logger.info("Closing client connection for %s", self.address())
-        self.__connection.socket.shutdown(socket.SHUT_RDWR)
-        self.__connection.socket.close()
+        self.__connection.writer.close()
+        await self.__connection.writer.wait_closed()
         self.__received_packets.clear()
         on_client_close.send(self)
 
-    def send(self, data: bytearray):
+    async def send(self, data: bytearray) -> None:
         """Sends data to the client.
 
         Args:
@@ -65,7 +69,8 @@ class Client():
             self.__received_packets.remove(data)
             return
 
-        self.__connection.socket.sendall(data)
+        self.__connection.writer.write(data)
+        await self.__connection.writer.drain()
 
     def is_active(self) -> bool:
         """Returns whether the client is active for communication.
@@ -86,23 +91,7 @@ class Client():
 
         return self.__address
 
-    def __handle_client(self) -> None:
-        """Bootstraps the client for communcation.
-        """
-
-        # Handle authorization, if not authorized stop client and return
-        if not self.__handle_authorization():
-            self.__logger.warning("Client authorization failed for %s", self.address())
-            self.stop()
-            return
-
-        # Handle packets
-        self.__handle_packets()
-
-        # Make sure client communication is stopped
-        self.stop()
-
-    def __handle_authorization(self) -> bool:
+    async def __handle_authorization(self) -> bool:
         """Handles client authorization.
 
         Returns:
@@ -113,7 +102,7 @@ class Client():
             return True
 
         try:
-            data = self.__connection.socket.recv(1024)
+            data = await self.__connection.reader.read(1024)
 
             if not data:
                 self.__logger.warning("Client %s disconnected before receiving authorization key", self.address())
@@ -126,25 +115,19 @@ class Client():
 
         return False
 
-    def __handle_packets(self) -> None:
+    async def __handle_packets(self) -> None:
         """Receives packet until client is no longer active.
         """
 
         parser = PacketParser()
 
-        # Receive data
         while self.is_active():
-
-            data: Optional[bytes] = None
-
             try:
-                data = self.__connection.socket.recv(1024)
+                data = await self.__connection.reader.read(1024)
             except Exception:
                 self.__logger.exception("Exception during packet receiving")
                 return
 
-            # If no data received from the socket, the client disconnected
-            # Break out of the loop
             if not data:
                 self.__logger.info("Received no data from client %s", self.address())
                 return

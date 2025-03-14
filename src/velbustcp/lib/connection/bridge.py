@@ -1,4 +1,4 @@
-from velbustcp.lib.connection.newserial.bus import Bus
+from velbustcp.lib.connection.serial.bus import Bus
 from velbustcp.lib.connection.tcp.networkmanager import NetworkManager
 from velbustcp.lib.signals import on_bus_receive, on_bus_send, on_tcp_receive
 import asyncio
@@ -19,13 +19,13 @@ class Bridge():
 
         def handle_bus_receive(sender, **kwargs):
             packet = kwargs["packet"]
-            self.__network_manager.send(packet)
+            asyncio.create_task(self.__network_manager.send(packet))
         self.handle_bus_receive = handle_bus_receive
         on_bus_receive.connect(handle_bus_receive)
 
         def handle_bus_send(sender, **kwargs):
             packet = kwargs["packet"]
-            self.__network_manager.send(packet)
+            asyncio.create_task(self.__network_manager.send(packet))
         self.handle_bus_send = handle_bus_send
         on_bus_send.connect(handle_bus_send)
 
@@ -43,11 +43,11 @@ class Bridge():
         """
 
         await self.__bus.ensure()
-        self.__network_manager.start()
+        await self.__network_manager.start()
 
     async def stop(self) -> None:
         """Stops NTP, bus and network.
         """
 
+        await self.__network_manager.stop()
         await self.__bus.stop()
-        self.__network_manager.stop()
