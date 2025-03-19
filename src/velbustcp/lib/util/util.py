@@ -26,7 +26,7 @@ def setup_logging(settings: LoggingSettings) -> logging.Logger:
     if settings.type == "debug":
         logger.setLevel(logging.DEBUG)
     else:
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
     # Set handler
     handler: logging.Handler

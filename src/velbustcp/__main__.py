@@ -43,12 +43,6 @@ class Main():
         """Stops the bridge."""
         await self.__bridge.stop()
 
-    def main_loop(self):
-        """Main loop for the program, blocks infinitely until it receives a KeyboardInterrupt.
-        """
-        q = Event()
-        q.wait()
-
 
 async def main_async(args=None):
     """Main asynchronous method."""
@@ -72,8 +66,9 @@ async def main_async(args=None):
     main = Main()
 
     try:
-        await main.start()
-        main.main_loop()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(await main.start())
+        loop.run_forever()
 
     except KeyboardInterrupt:
         logger.info("Interrupted, shutting down")

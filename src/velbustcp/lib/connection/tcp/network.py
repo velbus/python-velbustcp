@@ -51,6 +51,9 @@ class Network:
 
         self.__logger.info(f"Listening to TCP connections on {self.__options.address} [SSL:{self.__options.ssl}] [AUTH:{self.__options.auth}]")
 
+        async with self.__server:
+            await self.__server.serve_forever()
+
     async def stop(self) -> None:
         """Stops the TCP server
         """

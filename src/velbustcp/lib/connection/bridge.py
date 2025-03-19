@@ -42,8 +42,10 @@ class Bridge():
         """Starts bus and TCP network(s).
         """
 
-        await self.__bus.ensure()
-        await self.__network_manager.start()
+        serial_task = asyncio.create_task(self.__bus.ensure())
+        tcp_task = asyncio.create_task(self.__network_manager.start())
+        
+        await asyncio.gather(serial_task, tcp_task)
 
     async def stop(self) -> None:
         """Stops NTP, bus and network.

@@ -1,5 +1,4 @@
 import logging
-import asyncio
 from typing import Any, List
 
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection

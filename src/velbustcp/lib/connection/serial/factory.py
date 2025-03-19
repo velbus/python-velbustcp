@@ -17,7 +17,6 @@ def set_serial_settings() -> dict:
     }
 
 
-
 def find_port(options: SerialSettings) -> str:
     """Finds a port for the serial object."""
     if options.autodiscover:

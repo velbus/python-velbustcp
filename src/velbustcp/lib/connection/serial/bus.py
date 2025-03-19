@@ -24,6 +24,7 @@ class Bus:
     async def __reconnect(self):
         """Reconnects until active."""
         self.__logger.info("Attempting to connect")
+        await self.stop()
         while self.__do_reconnect and not self.is_active():
             try:
                 await self.__start()
@@ -40,8 +41,7 @@ class Bus:
         if self.is_active() or self.__do_reconnect:
             return
         self.__do_reconnect = True
-        self.__reconnect_task = asyncio.create_task(self.__reconnect())
-        await self.__reconnect_task
+        await self.__reconnect()
 
     async def __start(self):
         """Starts up the serial communication if the serial connection is not yet active."""
@@ -53,16 +53,15 @@ class Bus:
             raise ValueError("Couldn't find a port to open communication on")
 
         settings = set_serial_settings()
-        self.__protocol = VelbusSerialProtocol()
-        self.__transport, _ = await serial_asyncio_fast.create_serial_connection(
-            asyncio.get_event_loop(), lambda: self.__protocol, url=self.__port, **settings
+        self.__transport, self.__protocol = await serial_asyncio_fast.create_serial_connection(
+            asyncio.get_event_loop(), VelbusSerialProtocol, url=self.__port, **settings
         )
         self.__connected = True
 
         self.__writer = WriterThread(self.__transport)
-        asyncio.create_task(self.__writer.run())
-
         self.__logger.info("Serial connection active on port %s", self.__port)
+
+        await self.__writer.run()
 
     async def stop(self):
         """Stops the serial communication if the serial connection is active."""
@@ -98,5 +97,4 @@ class Bus:
             self.__writer.lock()
 
     def handle_on_bus_fault(self, sender, **kwargs):
-        asyncio.create_task(self.stop())
         asyncio.create_task(self.ensure())
