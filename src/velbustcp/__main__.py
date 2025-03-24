@@ -81,5 +81,10 @@ async def main_async(args=None):
 
     logger.info("Shutdown")
 
+# entrypoint for the snap
+def main(args=None):
+    """Main method."""
+    asyncio.run(main_async(args))
+
 if __name__ == '__main__':
-    asyncio.run(main_async())
+    sys.exit(main())
