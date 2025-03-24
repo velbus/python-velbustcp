@@ -24,7 +24,6 @@ class Bus:
     async def __reconnect(self):
         """Reconnects until active."""
         self.__logger.info("Attempting to connect")
-        await self.stop()
         while self.__do_reconnect and not self.is_active():
             try:
                 await self.__start()
@@ -96,5 +95,9 @@ class Bus:
         else:
             self.__writer.lock()
 
+    async def on_reconnection(self):
+        await self.stop()
+        await self.ensure()
+
     def handle_on_bus_fault(self, sender, **kwargs):
-        asyncio.create_task(self.ensure())
+        asyncio.create_task(self.on_reconnection())
