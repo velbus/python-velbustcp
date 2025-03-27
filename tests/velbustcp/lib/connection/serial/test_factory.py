@@ -5,13 +5,13 @@ from velbustcp.lib.connection.serial.factory import set_serial_settings
 def test_settings():
 
     serial = serial_for_url("loop://", timeout=1)
-    set_serial_settings(serial)
+    serial_settings = set_serial_settings()
 
-    assert serial.baudrate == 38400
-    assert serial.parity == PARITY_NONE
-    assert serial.stopbits == STOPBITS_ONE
-    assert serial.bytesize == EIGHTBITS
-    assert serial.xonxoff == 0
-    assert not serial.timeout
-    assert serial.dsrdtr == 1
-    assert serial.rtscts == 0
+    assert serial_settings.get("baudrate") == 38400
+    assert serial_settings.get("parity") == PARITY_NONE
+    assert serial_settings.get("stopbits") == STOPBITS_ONE
+    assert serial_settings.get("bytesize") == EIGHTBITS
+    assert serial_settings.get("xonxoff") == 0
+    assert not serial_settings.get("timeout")
+    assert serial_settings.get("dsrdtr") == 1
+    assert serial_settings.get("rtscts") == 0

@@ -22,6 +22,7 @@ class Network:
         self.__options: NetworkSettings = options
         self.__context: Optional[ssl.SSLContext] = None
         self.__server: Optional[asyncio.AbstractServer] = None
+        self.__is_active: bool = False  # New field to track server state
 
         # Hook up signal
         def handle_client_close(sender: Client, **kwargs):
@@ -33,6 +34,14 @@ class Network:
             self.__clients.remove(sender)
         self.handle_client_close = handle_client_close
         on_client_close.connect(handle_client_close)
+
+    def is_active(self) -> bool:
+        """Checks if the TCP server is active.
+
+        Returns:
+            bool: True if the server is running, False otherwise.
+        """
+        return self.__is_active
 
     async def start(self) -> None:
         """Starts up the TCP server
@@ -49,6 +58,7 @@ class Network:
             ssl=self.__context
         )
 
+        self.__is_active = True  # Set to True when the server starts
         self.__logger.info(f"Listening to TCP connections on {self.__options.address} [SSL:{self.__options.ssl}] [AUTH:{self.__options.auth}]")
 
         async with self.__server:
@@ -67,6 +77,7 @@ class Network:
             await client.stop()
 
         self.__clients.clear()
+        self.__is_active = False  # Set to False when the server stops
         self.__logger.info("Stopped TCP connection %s", self.__options.address)
 
     async def __handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -89,6 +100,9 @@ class Network:
         Args:
             data (bytearray): Specifies the packet to send to the connected clients of this network.
         """
+
+        if not self.is_active():
+            return
 
         if not self.__options.relay:
             return
