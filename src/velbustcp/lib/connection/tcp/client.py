@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, List
 
@@ -136,3 +137,5 @@ class Client:
             for packet in packets:
                 self.__received_packets.append(packet)
                 on_tcp_receive.send(self, packet=packet)
+
+            await asyncio.sleep(0)

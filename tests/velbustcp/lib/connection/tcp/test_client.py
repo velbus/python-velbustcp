@@ -39,7 +39,7 @@ async def test_auth_wrong_key(mocker: MockerFixture):
     conn.authorization_key = "something-different"
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
@@ -47,9 +47,13 @@ async def test_auth_wrong_key(mocker: MockerFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
@@ -62,7 +66,7 @@ async def test_auth_no_data(mocker: MockerFixture):
     conn.authorization_key = "velbus"
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
@@ -70,9 +74,13 @@ async def test_auth_no_data(mocker: MockerFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
@@ -85,7 +93,7 @@ async def test_auth_recv_exception(mocker: MockerFixture):
     conn.authorization_key = "velbus"
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
@@ -93,9 +101,13 @@ async def test_auth_recv_exception(mocker: MockerFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
@@ -107,7 +119,7 @@ async def test_packet_empty(mocker: MockFixture):
     conn.should_authorize = False
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
@@ -115,9 +127,13 @@ async def test_packet_empty(mocker: MockFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
@@ -134,15 +150,18 @@ async def test_packet_handling(mocker: MockFixture):
 
     def on_packet_receive(sender, **kwargs):
         packet = kwargs["packet"]
-        if packet == bytearray(data):
+        if packet == bytearray(data) and not e.is_set():
             e.set()
 
     on_tcp_receive.connect(on_packet_receive)
 
     client = Client(conn)
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    await e.wait()  # Use asyncio.Event for waiting
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
 
     await client.stop()
     assert not client.is_active()
@@ -164,11 +183,14 @@ async def test_packet_recv_exception(mocker: MockerFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    await e.wait()  # Use asyncio.Event for waiting
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
-
 
 @pytest.mark.asyncio
 async def test_client_send(mocker: MockerFixture):
@@ -186,10 +208,14 @@ async def test_client_send(mocker: MockerFixture):
     conn.writer.write.assert_not_called()
 
     # Start client and try sending
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
+    await asyncio.sleep(0)
+
     await client.send(bytearray(data))
     conn.writer.write.assert_called_with(data)
+
     await client.stop()
+    await task
 
 
 @pytest.mark.asyncio
@@ -205,7 +231,11 @@ async def test_client_send_not_own_packet(mocker: MockerFixture):
 
     # Start client and try sending
     # should fail because it originated from that client
-    await client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
+    await asyncio.sleep(0)
+
     await client.send(bytearray(data))
     conn.writer.write.assert_not_called()
+
     await client.stop()
+    await task
