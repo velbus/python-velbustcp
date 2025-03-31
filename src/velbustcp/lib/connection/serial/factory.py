@@ -1,57 +1,26 @@
-import serial
-
+from typing import Any
+import serial_asyncio_fast
 from velbustcp.lib.settings.serial import SerialSettings
 from velbustcp.lib.util.util import search_for_serial
 
 
-def set_serial_settings(s: serial.Serial):
-    """Sets settings on a Serial object for use with the Velbus protcol
-
-    Args:
-        s (serial.Serial): A serial object.
-    """
-
-    s.baudrate = 38400
-    s.parity = serial.PARITY_NONE
-    s.stopbits = serial.STOPBITS_ONE
-    s.bytesize = serial.EIGHTBITS
-    s.xonxoff = 0
-    s.timeout = None
-    s.dsrdtr = 1
-    s.rtscts = 0
-
-
-def construct_serial_obj(port: str) -> serial.Serial:
-    """Constructs a serial object for use with the Velbus protocol.
-
-    Args:
-        port (str): A port suitable for the serial object.
-
-    Returns:
-        serial.Serial: A serial object.
-    """
-
-    s = serial.Serial(port)
-    set_serial_settings(s)
-
-    return s
+def set_serial_settings() -> dict[str, Any]:
+    """Returns settings for a Serial object for use with the Velbus protocol."""
+    return {
+        'baudrate': 38400,
+        'parity': serial_asyncio_fast.serial.PARITY_NONE,
+        'stopbits': serial_asyncio_fast.serial.STOPBITS_ONE,
+        'bytesize': serial_asyncio_fast.serial.EIGHTBITS,
+        'xonxoff': 0,
+        'timeout': None,
+        'dsrdtr': 1,
+        'rtscts': 0
+    }
 
 
 def find_port(options: SerialSettings) -> str:
-    """[summary]
-
-    Args:
-        options (SerialSettings): [description]
-
-    Returns:
-        str: A port name
-    """
-
-    # If we need to autodiscover port
+    """Finds a port for the serial object."""
     if options.autodiscover:
         ports = search_for_serial()
-
         return next((port for port in ports), options.port)
-
-    # No port found (or no autodiscover)
     return options.port

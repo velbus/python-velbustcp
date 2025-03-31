@@ -1,10 +1,11 @@
-import socket
+import asyncio
 
 
-class ClientConnection():
+class ClientConnection:
     """Represents an incoming client connection.
     """
 
-    socket: socket.socket
+    reader: asyncio.StreamReader
+    writer: asyncio.StreamWriter
     should_authorize: bool = False
     authorization_key: str = ""

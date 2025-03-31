@@ -1,26 +1,23 @@
-import threading
+import asyncio
+import pytest
 from velbustcp.lib.connection.tcp.client import Client
 from pytest_mock import MockFixture, MockerFixture
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.signals import on_client_close, on_tcp_receive
 
 
-def get_mock_socket(mocker: MockerFixture):
-
-    def get_address():
-        return "mock"
-
-    socket = mocker.Mock()
-    socket.getpeername = get_address
-
-    return socket
+def get_mock_connection(mocker: MockerFixture):
+    """Creates a mock ClientConnection with mocked reader and writer."""
+    connection = mocker.Mock(spec=ClientConnection)
+    connection.reader = mocker.AsyncMock()
+    connection.writer = mocker.AsyncMock()
+    connection.writer.get_extra_info = mocker.Mock(return_value="mock")
+    return connection
 
 
 def test_defaults(mocker: MockerFixture):
-
     # Create connection
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
+    conn = get_mock_connection(mocker)
 
     # Create client
     client = Client(conn)
@@ -32,97 +29,96 @@ def test_defaults(mocker: MockerFixture):
     assert not client.is_active()
 
 
-def test_auth_wrong_key(mocker: MockerFixture):
-
+@pytest.mark.asyncio
+async def test_auth_wrong_key(mocker: MockerFixture):
     # Create connection
-    def recv(len):
-        return "velbus".encode("utf-8")
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(return_value="velbus".encode("utf-8"))
     conn.should_authorize = True
     conn.authorization_key = "something-different"
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
+
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
-def test_auth_no_data(mocker: MockerFixture):
-
+@pytest.mark.asyncio
+async def test_auth_no_data(mocker: MockerFixture):
     # Create connection
-    def recv(len):
-        return bytes()
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(return_value=b"")
     conn.should_authorize = True
     conn.authorization_key = "velbus"
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
+
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
-def test_auth_recv_exception(mocker: MockerFixture):
-
+@pytest.mark.asyncio
+async def test_auth_recv_exception(mocker: MockerFixture):
     # Create connection
-    def recv(len):
-        raise Exception("Thrown on purpose")
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(side_effect=Exception("Thrown on purpose"))
     conn.should_authorize = True
     conn.authorization_key = "velbus"
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
+
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
-def test_packet_empty(mocker: MockFixture):
-
+@pytest.mark.asyncio
+async def test_packet_empty(mocker: MockFixture):
     # Create connection
-    def recv(len):
-        return bytes()
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(return_value=b"")
     conn.should_authorize = False
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
@@ -130,57 +126,55 @@ def test_packet_empty(mocker: MockFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
-def test_packet_handling(mocker: MockFixture):
-
+@pytest.mark.asyncio
+async def test_packet_handling(mocker: MockFixture):
     # Create connection
     data = bytes([0x0F, 0xFB, 0xFF, 0x40, 0xB7, 0x04])
-
-    def recv(len):
-        return data
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(return_value=data)
     conn.should_authorize = False
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def on_packet_receive(sender, **kwargs):
         packet = kwargs["packet"]
-        if (packet == bytearray(data)):
+        if packet == bytearray(data) and not e.is_set():
             e.set()
-
-    client = Client(conn)
-    client.start()
 
     on_tcp_receive.connect(on_packet_receive)
 
-    e.wait()
+    client = Client(conn)
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    client.stop()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
+    await client.stop()
     assert not client.is_active()
 
 
-def test_packet_recv_exception(mocker: MockerFixture):
-
+@pytest.mark.asyncio
+async def test_packet_recv_exception(mocker: MockerFixture):
     # Create connection
-    def recv(len):
-        raise Exception("Thrown on purpose")
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(side_effect=Exception("Thrown on purpose"))
     conn.should_authorize = False
 
     # Create client
-    e = threading.Event()
+    e = asyncio.Event()
 
     def handle_client_close(sender, **kwargs):
         e.set()
@@ -188,50 +182,48 @@ def test_packet_recv_exception(mocker: MockerFixture):
     on_client_close.connect(handle_client_close)
 
     client = Client(conn)
-    client.start()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
 
-    e.wait()
+    await e.wait()  # Wait for the event to be set
+
+    await client.stop()
+    await task
+
     assert not client.is_active()
 
 
-def test_client_send(mocker: MockerFixture):
-
+@pytest.mark.asyncio
+async def test_client_send(mocker: MockerFixture):
     # Create connection
     data = bytes([0x0F, 0xFB, 0xFF, 0x40, 0xB7, 0x04])
-
-    def recv(len):
-        return [0x00]
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(return_value=b"\x00")
     conn.should_authorize = False
 
     # Create client
     client = Client(conn)
 
     # First send data without client being connected
-    client.send(data)
-    conn.socket.sendall.assert_not_called()
+    await client.send(data)
+    conn.writer.write.assert_not_called()
 
     # Start client and try sending
-    client.start()
-    client.send(bytearray(data))
-    conn.socket.sendall.assert_called_with(data)
-    client.stop()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
+    await asyncio.sleep(0)
+
+    await client.send(bytearray(data))
+    conn.writer.write.assert_called_with(data)
+
+    await client.stop()
+    await task
 
 
-def test_client_send_not_own_packet(mocker: MockerFixture):
-
+@pytest.mark.asyncio
+async def test_client_send_not_own_packet(mocker: MockerFixture):
     # Create connection
     data = bytes([0x0F, 0xFB, 0xFF, 0x40, 0xB7, 0x04])
-
-    def recv(len):
-        return data
-
-    conn = ClientConnection()
-    conn.socket = get_mock_socket(mocker)
-    conn.socket.recv = recv
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(return_value=data)
     conn.should_authorize = False
 
     # Create client
@@ -239,7 +231,11 @@ def test_client_send_not_own_packet(mocker: MockerFixture):
 
     # Start client and try sending
     # should fail because it originated from that client
-    client.start()
-    client.send(bytearray(data))
-    conn.socket.sendall.assert_not_called()
-    client.stop()
+    task = asyncio.create_task(client.start())  # Run client.start() as a separate task
+    await asyncio.sleep(0)
+
+    await client.send(bytearray(data))
+    conn.writer.write.assert_not_called()
+
+    await client.stop()
+    await task
