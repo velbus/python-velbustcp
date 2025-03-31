@@ -44,7 +44,7 @@ class Bridge():
 
         serial_task = asyncio.create_task(self.__bus.ensure())
         tcp_task = asyncio.create_task(self.__network_manager.start())
-        
+
         await asyncio.gather(serial_task, tcp_task)
 
     async def stop(self) -> None:

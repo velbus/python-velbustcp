@@ -1,5 +1,4 @@
 import asyncio
-import threading
 import pytest
 from velbustcp.lib.connection.tcp.client import Client
 from pytest_mock import MockFixture, MockerFixture

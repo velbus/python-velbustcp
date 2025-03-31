@@ -1,9 +1,10 @@
+from typing import Any
 import serial_asyncio_fast
 from velbustcp.lib.settings.serial import SerialSettings
 from velbustcp.lib.util.util import search_for_serial
 
 
-def set_serial_settings() -> dict:
+def set_serial_settings() -> dict[str, Any]:
     """Returns settings for a Serial object for use with the Velbus protocol."""
     return {
         'baudrate': 38400,

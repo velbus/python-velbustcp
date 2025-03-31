@@ -4,7 +4,7 @@ from velbustcp.lib.connection.serial.factory import set_serial_settings
 
 def test_settings():
 
-    serial = serial_for_url("loop://", timeout=1)
+    serial_for_url("loop://", timeout=1)
     serial_settings = set_serial_settings()
 
     assert serial_settings.get("baudrate") == 38400

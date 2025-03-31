@@ -1,5 +1,5 @@
 
-import pytest 
+import pytest
 
 from pytest_mock import MockerFixture
 from velbustcp.lib.connection.bridge import Bridge
