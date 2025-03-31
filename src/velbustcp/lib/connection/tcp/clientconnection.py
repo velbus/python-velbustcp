@@ -1,5 +1,6 @@
 import asyncio
 
+
 class ClientConnection:
     """Represents an incoming client connection.
     """

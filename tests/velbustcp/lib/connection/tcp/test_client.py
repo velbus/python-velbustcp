@@ -192,6 +192,7 @@ async def test_packet_recv_exception(mocker: MockerFixture):
 
     assert not client.is_active()
 
+
 @pytest.mark.asyncio
 async def test_client_send(mocker: MockerFixture):
     # Create connection

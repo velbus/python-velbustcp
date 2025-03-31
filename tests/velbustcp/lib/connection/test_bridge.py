@@ -9,6 +9,7 @@ BUS_ACTIVE_DATA = bytearray([ETX, PRIORITY_HIGH, 0x00, 0x01, COMMAND_BUS_ACTIVE,
 BUS_OFF_DATA = bytearray([ETX, PRIORITY_HIGH, 0x00, 0x01, COMMAND_BUS_OFF, 0x00, STX])
 BUS_BUFFER_READY_DATA = bytearray([ETX, PRIORITY_HIGH, 0x00, 0x01, COMMAND_BUS_BUFFERREADY, 0x00, STX])
 
+
 @pytest.mark.asyncio
 async def test_bridge_start(mocker: MockerFixture):
     mock_bus = mocker.AsyncMock()

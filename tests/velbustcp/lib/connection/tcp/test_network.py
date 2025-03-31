@@ -39,6 +39,7 @@ async def test_start_stop(mocker: MockFixture):
     except asyncio.CancelledError:
         pass
 
+
 @pytest.mark.asyncio
 async def test_send_not_active(mocker: MockFixture):
 
