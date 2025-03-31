@@ -1,6 +1,5 @@
 import argparse
 import json
-from threading import Event
 import sys
 import asyncio
 
@@ -81,10 +80,12 @@ async def main_async(args=None):
 
     logger.info("Shutdown")
 
+
 # entrypoint for the snap
 def main(args=None):
     """Main method."""
     asyncio.run(main_async(args))
+
 
 if __name__ == '__main__':
     sys.exit(main())
