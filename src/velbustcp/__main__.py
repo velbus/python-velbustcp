@@ -43,8 +43,12 @@ class Main():
         await self.__bridge.stop()
 
 
-async def main_async(args=None):
-    """Main asynchronous method."""
+async def main_async(args=None) -> int:
+    """Main asynchronous method.
+
+    Returns:
+        int: The process exit code, non-zero if the bridge failed.
+    """
     parser = argparse.ArgumentParser(description="Velbus communication")
     parser.add_argument("--settings", help="Settings file", required=False)
     args = parser.parse_args()
@@ -63,6 +67,7 @@ async def main_async(args=None):
 
     # Create main class
     main = Main()
+    exit_code = 0
 
     try:
         loop = asyncio.get_event_loop()
@@ -74,17 +79,19 @@ async def main_async(args=None):
 
     except Exception as e:
         logger.exception(e)
+        exit_code = 1
 
     finally:
         await main.stop()
 
     logger.info("Shutdown")
+    return exit_code
 
 
 # entrypoint for the snap
-def main(args=None):
+def main(args=None) -> int:
     """Main method."""
-    asyncio.run(main_async(args))
+    return asyncio.run(main_async(args))
 
 
 if __name__ == '__main__':
