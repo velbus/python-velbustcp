@@ -1,4 +1,6 @@
 import asyncio
+import errno
+import logging
 import pytest
 from velbustcp.lib.connection.tcp.client import Client
 from pytest_mock import MockFixture, MockerFixture
@@ -239,3 +241,74 @@ async def test_client_send_not_own_packet(mocker: MockerFixture):
 
     await client.stop()
     await task
+
+
+CONNECTION_LOST_ERRORS = [
+    ConnectionResetError(errno.ECONNRESET, "Connection reset by peer"),
+    OSError(errno.EHOSTUNREACH, "No route to host"),
+    OSError(errno.ENETUNREACH, "Network is unreachable"),
+    OSError(errno.ETIMEDOUT, "Connection timed out"),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", CONNECTION_LOST_ERRORS)
+async def test_connection_reset(mocker: MockerFixture, caplog: pytest.LogCaptureFixture, error: OSError):
+    # Create connection where the peer is gone, which is also what wait_closed reports
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(side_effect=error)
+    conn.writer.wait_closed = mocker.AsyncMock(side_effect=error)
+    conn.should_authorize = False
+
+    closed = []
+
+    def handle_client_close(sender, **kwargs):
+        closed.append(sender)
+
+    on_client_close.connect(handle_client_close)
+
+    # Must not raise, and must still report the client as closed
+    client = Client(conn)
+    await client.start()
+
+    assert not client.is_active()
+    assert client in closed
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", CONNECTION_LOST_ERRORS)
+async def test_auth_connection_reset(mocker: MockerFixture, caplog: pytest.LogCaptureFixture, error: OSError):
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(side_effect=error)
+    conn.writer.wait_closed = mocker.AsyncMock(side_effect=error)
+    conn.should_authorize = True
+    conn.authorization_key = "velbus"
+
+    closed = []
+
+    def handle_client_close(sender, **kwargs):
+        closed.append(sender)
+
+    on_client_close.connect(handle_client_close)
+
+    client = Client(conn)
+    await client.start()
+
+    assert not client.is_active()
+    assert client in closed
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+@pytest.mark.asyncio
+async def test_unexpected_os_error(mocker: MockerFixture, caplog: pytest.LogCaptureFixture):
+    # OSErrors that do not indicate a lost connection must still be reported as errors
+    conn = get_mock_connection(mocker)
+    conn.reader.read = mocker.AsyncMock(side_effect=OSError(errno.EBADF, "Bad file descriptor"))
+    conn.should_authorize = False
+
+    client = Client(conn)
+    await client.start()
+
+    assert not client.is_active()
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR]

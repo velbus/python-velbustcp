@@ -1,4 +1,5 @@
 import asyncio
+import errno
 import pytest
 from pytest_mock import MockFixture
 
@@ -54,3 +55,31 @@ async def test_send_not_active(mocker: MockFixture):
     # Assert
     spy.assert_called_once()
     assert not spy.spy_return
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [
+    ConnectionResetError(104, "Connection reset by peer"),
+    OSError(errno.EHOSTUNREACH, "No route to host"),
+    RuntimeError("Thrown on purpose"),
+])
+async def test_send_client_failure(mocker: MockFixture, error: Exception):
+
+    # Arrange
+    network = Network(options=NetworkSettings())
+    mocker.patch.object(network, 'is_active', return_value=True)
+
+    failing = mocker.Mock()
+    failing.send = mocker.AsyncMock(side_effect=error)
+    healthy = mocker.Mock()
+    healthy.send = mocker.AsyncMock()
+    network._Network__clients = [failing, healthy]  # type: ignore[attr-defined]
+
+    data = bytearray([0x0F])
+
+    # Act, must not raise
+    await network.send(data)
+
+    # Assert, the healthy client still got the data
+    failing.send.assert_awaited_once_with(data)
+    healthy.send.assert_awaited_once_with(data)
