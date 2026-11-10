@@ -1,6 +1,8 @@
 import logging
 import logging.handlers
 
+import pytest
+
 from velbustcp.lib.settings.logging import LoggingSettings
 from velbustcp.lib.util.util import setup_logging, str2bool
 
@@ -43,3 +45,37 @@ def test_output_syslog():
     logger = setup_logging(settings)
     assert logger.name == settings.name
     assert isinstance(logger.handlers[0], logging.handlers.SysLogHandler)
+    assert logger.handlers[0].address == ("localhost", logging.handlers.SYSLOG_UDP_PORT)
+
+
+@pytest.mark.parametrize("existing,expected", [
+    (["/dev/log", "/var/run/syslog"], "/dev/log"),
+    (["/var/run/syslog"], "/var/run/syslog"),
+    ([], "/dev/log"),
+])
+def test_output_syslog_local(mocker, existing, expected):
+    mocker.patch("velbustcp.lib.util.util.socket", spec=["AF_UNIX"])
+    mocker.patch("velbustcp.lib.util.util.os.path.exists", side_effect=lambda path: path in existing)
+    handler_class = mocker.patch("velbustcp.lib.util.util.logging.handlers.SysLogHandler")
+    handler_class.return_value = logging.NullHandler()
+
+    settings = LoggingSettings()
+    settings.name = "test-logger-syslog-local-" + expected
+    settings.output = "syslog-local"
+
+    logger = setup_logging(settings)
+    handler_class.assert_called_once_with(address=expected)
+    assert logger.handlers[0].ident == "velbustcp: "
+    assert logger.handlers[0].append_nul is False
+
+
+def test_output_syslog_local_unsupported(mocker):
+
+    mocker.patch("velbustcp.lib.util.util.socket", spec=[])
+
+    settings = LoggingSettings()
+    settings.name = "test-logger-syslog-local-unsupported"
+    settings.output = "syslog-local"
+
+    with pytest.raises(ValueError):
+        setup_logging(settings)

@@ -1,7 +1,7 @@
 from typing import Dict  # noqa: F401
 
 LOGGING_TYPES = ["debug", "info"]
-LOGGING_OUTPUT = ["syslog", "stream"]
+LOGGING_OUTPUT = ["syslog", "syslog-local", "stream"]
 
 
 class LoggingSettings():
@@ -26,7 +26,9 @@ class LoggingSettings():
         if "output" in settings_dict:
 
             if (not settings_dict["output"] in LOGGING_OUTPUT):
-                raise ValueError("Provided option logging.output incorrect, expected 'syslog' or 'stream', got '{0}'".format(settings_dict["output"]))
+                raise ValueError(
+                    "Provided option logging.output incorrect, expected 'syslog', 'syslog-local' or 'stream', got '{0}'".format(settings_dict["output"])
+                )
 
             settings.output = settings_dict["output"]
 

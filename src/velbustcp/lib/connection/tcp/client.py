@@ -1,10 +1,17 @@
 import asyncio
+import errno
 import logging
-from typing import Any, List
+from typing import Any, List, Optional
 
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.packet.packetparser import PacketParser
 from velbustcp.lib.signals import on_tcp_receive, on_client_close
+
+CONNECTION_LOST_ERRNOS = {errno.EHOSTUNREACH, errno.ENETUNREACH, errno.ETIMEDOUT}
+
+
+def is_connection_lost(e: Optional[BaseException]) -> bool:
+    return isinstance(e, ConnectionError) or (isinstance(e, OSError) and e.errno in CONNECTION_LOST_ERRNOS)
 
 
 class Client:
@@ -51,9 +58,16 @@ class Client:
         self.__is_active = False
         self.__logger.info("Closing client connection for %s", self.address())
         self.__connection.writer.close()
-        await self.__connection.writer.wait_closed()
-        self.__received_packets.clear()
-        on_client_close.send(self)
+
+        try:
+            await self.__connection.writer.wait_closed()
+        except OSError as e:
+            # wait_closed re-raises the error the transport was closed with, e.g. when the peer reset
+            # the connection. The connection is gone either way, so still clean up below.
+            self.__logger.info("Connection for %s was not closed cleanly: %s", self.address(), e)
+        finally:
+            self.__received_packets.clear()
+            on_client_close.send(self)
 
     async def send(self, data: bytearray) -> None:
         """Sends data to the client.
@@ -110,8 +124,11 @@ class Client:
 
             return self.__connection.authorization_key == data.decode("utf-8").strip()
 
-        except Exception:
-            self.__logger.exception("Exception during authorization for %s", self.address())
+        except Exception as e:
+            if is_connection_lost(e):
+                self.__logger.info("Connection lost during authorization for %s: %s", self.address(), e)
+            else:
+                self.__logger.exception("Exception during authorization for %s", self.address())
 
         return False
 
@@ -124,8 +141,11 @@ class Client:
         while self.is_active():
             try:
                 data = await self.__connection.reader.read(1024)
-            except Exception:
-                self.__logger.exception("Exception during packet receiving")
+            except Exception as e:
+                if is_connection_lost(e):
+                    self.__logger.info("Connection lost with client %s: %s", self.address(), e)
+                else:
+                    self.__logger.exception("Exception during packet receiving")
                 return
 
             if not data:

@@ -2,7 +2,7 @@ import asyncio
 import ssl
 import logging
 from typing import List, Optional
-from velbustcp.lib.connection.tcp.client import Client
+from velbustcp.lib.connection.tcp.client import Client, is_connection_lost
 from velbustcp.lib.connection.tcp.clientconnection import ClientConnection
 from velbustcp.lib.settings.network import NetworkSettings
 from velbustcp.lib.signals import on_client_close
@@ -110,5 +110,11 @@ class Network:
         if self.__logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             self.__logger.debug("[TCP OUT] %s", " ".join(hex(x) for x in data))
 
-        tasks = [client.send(data) for client in self.__clients]
-        await asyncio.gather(*tasks)
+        clients = list(self.__clients)
+        results = await asyncio.gather(*(client.send(data) for client in clients), return_exceptions=True)
+
+        for client, result in zip(clients, results):
+            if is_connection_lost(result):
+                self.__logger.warning("Connection lost while sending to client %s: %s", client.address(), result)
+            elif isinstance(result, Exception):
+                self.__logger.error("Could not send data to client %s", client.address(), exc_info=result)
